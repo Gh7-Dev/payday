@@ -22,3 +22,8 @@
 - Implemented `normalizeKenyaPhone` in `app/src/phone.ts` converting Kenyan numbers to E.164 `+254XXXXXXXXX`.
 - Implemented `validateCsv` and `expandCycle` in `app/src/csv.ts` with `csv-parse`, returning rows and per-day / grand totals or up to 20 structured errors with stable lowercase error codes.
 - Added comprehensive unit tests in `test/money.test.ts`, `test/phone.test.ts`, and `test/csv.test.ts`.
+
+## S5 - Chain interface + mock
+- Created backend-only `ChainInterface` and `ChainError` in `app/src/chain/interface.ts` (`getRentExempt`, `getFeePerSignature`, `getProgramme`, `getVaultBalance`, `isTrainerRegistered`, `enroll`, `topUp`).
+- Implemented in-memory `MockChain` in `app/src/chain/mock.ts` with default rent formula `(bytes+128)*5080` and fee `5000`, along with test helpers (`createProgramme`, `fund`, `addTrainer`, `markReclaimed`).
+- Wrote tests in `app/test/chain.test.ts` testing rent exemptions, funding requirements, duplicate/capacity constraints, schedule length checks, reclaim restrictions, trainer registration, and wallet top-ups.
