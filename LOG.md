@@ -27,3 +27,8 @@
 - Created backend-only `ChainInterface` and `ChainError` in `app/src/chain/interface.ts` (`getRentExempt`, `getFeePerSignature`, `getProgramme`, `getVaultBalance`, `isTrainerRegistered`, `enroll`, `topUp`).
 - Implemented in-memory `MockChain` in `app/src/chain/mock.ts` with default rent formula `(bytes+128)*5080` and fee `5000`, along with test helpers (`createProgramme`, `fund`, `addTrainer`, `markReclaimed`).
 - Wrote tests in `app/test/chain.test.ts` testing rent exemptions, funding requirements, duplicate/capacity constraints, schedule length checks, reclaim restrictions, trainer registration, and wallet top-ups.
+
+## S4 - Cost estimator & config
+- Implemented `src/config.ts` reading demo overrides (enforcing future demo start), top-up configurations, optional FX rates, and `kenyaMidnightUnix` calculating UTC+3 00:00:00 timestamp.
+- Implemented `src/cost.ts` calculating separate line items: stipends, rent (via `ChainInterface`), fees, trainer top-ups, and optional combined USD estimate.
+- Added tests in `test/cost.test.ts` verifying exact lamport values for accounts, sensitivity to mock rent changes, and rate behavior.
