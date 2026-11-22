@@ -8,3 +8,6 @@
 | `@types/node` | TypeScript definitions for Node.js | ^22.10.2 | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | `tsx` | TypeScript execution and loader for running tests with Node's native test runner | ^4.19.2 | https://tsx.is |
 | `csv-parse` | Streaming and synchronous CSV parsing with full RFC 4180 compliance | ^5.6.0 | https://csv.js.org/parse/ |
+| `tweetnacl` | ed25519 sign/verify for Solana wallet signature authentication | ^1.0.3 | https://github.com/dchest/tweetnacl-js |
+| `bs58` | Base58 encoding/decoding for Solana public keys | ^6.0.0 | https://github.com/cryptocoinjs/bs58 |
+| `base-x` | Generic base-N encoding/decoding (transitive dep of bs58) | ^4.0.0 | https://github.com/cryptocoinjs/base-x |
