@@ -43,10 +43,23 @@ export function createNonce(db: DatabaseSync, wallet: string): NonceResult {
   const id = sha256hex(`nonce:${wallet}:${nonce}:${now}`);
   const message = buildNonceMessage(wallet, nonce, expiresAt);
 
-  // Remove any old nonce rows for this wallet to prevent accumulation
-  db.prepare(`DELETE FROM sessions WHERE wallet_address = ? AND nonce != ''`).run(wallet);
-  // Also clean up old nonce rows (wallet_address IS NULL) for this wallet stored in nonce field
-  // We store wallet in wallet_address for nonce rows too, so we can look them up
+  // 1) Delete expired nonce rows for this wallet
+  db.prepare(`DELETE FROM sessions WHERE wallet_address = ? AND nonce != '' AND expires_at <= ?`).run(wallet, now);
+
+  // 2) Keep at most 5 live ones (if currently >= 5 live rows, delete the oldest so that adding 1 leaves at most 5)
+  // Retrieve all currently active nonce rows for this wallet ordered oldest to newest (created_at ASC)
+  const activeRows = db.prepare(
+    `SELECT id FROM sessions WHERE wallet_address = ? AND nonce != '' AND expires_at > ? ORDER BY created_at ASC`
+  ).all(wallet, now) as Array<{ id: string }>;
+
+  if (activeRows.length >= 5) {
+    const toDeleteCount = activeRows.length - 4; // leave 4 so after insert we have 5
+    for (let i = 0; i < toDeleteCount; i++) {
+      db.prepare(`DELETE FROM sessions WHERE id = ?`).run(activeRows[i].id);
+    }
+  }
+
+  // Insert the new nonce
   db.prepare(
     `INSERT INTO sessions (id, wallet_address, nonce, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`
   ).run(id, wallet, nonce, expiresAt, now);
@@ -64,19 +77,6 @@ export function verifyAndCreateSession(
 
   const now = nowSec();
 
-  // Find the nonce row for this wallet — nonce rows have a nonce value and wallet in wallet_address
-  // We identify nonce rows by the fact they're not session rows; sessions have no nonce (empty nonce)
-  // Actually per schema design: nonce rows have wallet_address set and nonce set; sessions have wallet_address set and nonce=''
-  const row = db.prepare(
-    `SELECT id, nonce, expires_at FROM sessions WHERE wallet_address = ? AND nonce != '' AND expires_at > ? LIMIT 1`
-  ).get(wallet, now) as { id: string; nonce: string; expires_at: number } | undefined;
-
-  if (!row) return null;
-
-  // Verify signature
-  const message = buildNonceMessage(wallet, row.nonce, row.expires_at);
-  const msgBytes = new TextEncoder().encode(message);
-
   let sigBytes: Uint8Array;
   try {
     sigBytes = bs58.decode(signatureBase58);
@@ -84,11 +84,27 @@ export function verifyAndCreateSession(
     return null;
   }
 
-  const valid = nacl.sign.detached.verify(msgBytes, sigBytes, pubkeyBytes);
-  if (!valid) return null;
+  // Check all unexpired nonce rows for this wallet to find a matching valid signature
+  const rows = db.prepare(
+    `SELECT id, nonce, expires_at FROM sessions WHERE wallet_address = ? AND nonce != '' AND expires_at > ? ORDER BY created_at DESC`
+  ).all(wallet, now) as Array<{ id: string; nonce: string; expires_at: number }>;
 
-  // Delete the nonce row (single-use)
-  db.prepare(`DELETE FROM sessions WHERE id = ?`).run(row.id);
+  if (rows.length === 0) return null;
+
+  let matchedRow: { id: string; nonce: string; expires_at: number } | null = null;
+  for (const row of rows) {
+    const message = buildNonceMessage(wallet, row.nonce, row.expires_at);
+    const msgBytes = new TextEncoder().encode(message);
+    if (nacl.sign.detached.verify(msgBytes, sigBytes, pubkeyBytes)) {
+      matchedRow = row;
+      break;
+    }
+  }
+
+  if (!matchedRow) return null;
+
+  // Nonce is consumed ONLY after successful verify: delete the matched nonce row
+  db.prepare(`DELETE FROM sessions WHERE id = ?`).run(matchedRow.id);
 
   // Create session token
   const tokenHex = randomBytes(32).toString('hex');

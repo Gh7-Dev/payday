@@ -89,7 +89,6 @@ describe('auth routes', () => {
       body: JSON.stringify({ wallet, signature: badSig }),
     });
     assert.equal(verifyRes.status, 401);
-    // suppress unused variable warning
     void message;
   });
 
@@ -193,6 +192,111 @@ describe('auth routes', () => {
     });
     const setCookie = verifyRes.headers.get('set-cookie') ?? '';
     assert.ok(setCookie.toLowerCase().includes('httponly'), 'HttpOnly flag present');
+  });
+
+  test('Secure present by default and disabled only when COOKIE_SECURE=false', async () => {
+    const origEnv = process.env.COOKIE_SECURE;
+    try {
+      delete process.env.COOKIE_SECURE;
+      const { app } = makeApp();
+      const kp = nacl.sign.keyPair();
+      const wallet = bs58.encode(kp.publicKey);
+
+      const nonceRes = await app.request('/auth/nonce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet }),
+      });
+      const { message } = await nonceRes.json() as { message: string };
+      const signature = signMessage(message, kp.secretKey);
+
+      // Default: Secure present even on localhost
+      const verifyRes1 = await app.request('/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', host: 'localhost:3000' },
+        body: JSON.stringify({ wallet, signature }),
+      });
+      const cookie1 = verifyRes1.headers.get('set-cookie') ?? '';
+      assert.ok(cookie1.includes('Secure'), 'Secure flag should be present by default');
+
+      // COOKIE_SECURE='false': Secure omitted
+      process.env.COOKIE_SECURE = 'false';
+      const nonceRes2 = await app.request('/auth/nonce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet }),
+      });
+      const { message: message2 } = await nonceRes2.json() as { message: string };
+      const signature2 = signMessage(message2, kp.secretKey);
+
+      const verifyRes2 = await app.request('/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet, signature: signature2 }),
+      });
+      const cookie2 = verifyRes2.headers.get('set-cookie') ?? '';
+      assert.ok(!cookie2.includes('Secure'), 'Secure flag should be absent when COOKIE_SECURE=false');
+    } finally {
+      if (origEnv !== undefined) {
+        process.env.COOKIE_SECURE = origEnv;
+      } else {
+        delete process.env.COOKIE_SECURE;
+      }
+    }
+  });
+
+  test('failed verify then correct verify works', async () => {
+    const { app } = makeApp();
+    const kp = nacl.sign.keyPair();
+    const wallet = bs58.encode(kp.publicKey);
+
+    const nonceRes = await app.request('/auth/nonce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet }),
+    });
+    const { message } = await nonceRes.json() as { message: string };
+
+    // 1. Attempt verify with bad signature - should fail with 401
+    const badSig = bs58.encode(new Uint8Array(64).fill(1));
+    const badVerifyRes = await app.request('/auth/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet, signature: badSig }),
+    });
+    assert.equal(badVerifyRes.status, 401);
+
+    // 2. Attempt verify with correct signature - should succeed (nonce not consumed by bad verify)
+    const validSignature = signMessage(message, kp.secretKey);
+    const goodVerifyRes = await app.request('/auth/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet, signature: validSignature }),
+    });
+    assert.equal(goodVerifyRes.status, 200);
+    const body = await goodVerifyRes.json() as { ok: boolean };
+    assert.equal(body.ok, true);
+  });
+
+  test('6 nonce calls leave 5 rows', async () => {
+    const { app, db } = makeApp();
+    const kp = nacl.sign.keyPair();
+    const wallet = bs58.encode(kp.publicKey);
+
+    for (let i = 0; i < 6; i++) {
+      const res = await app.request('/auth/nonce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet }),
+      });
+      assert.equal(res.status, 200);
+    }
+
+    const rows = db.prepare(
+      `SELECT count(*) as cnt FROM sessions WHERE wallet_address = ? AND nonce != ''`
+    ).get(wallet) as { cnt: number };
+
+    assert.equal(rows.cnt, 5);
   });
 
   test('/auth/me without cookie gives 401', async () => {

@@ -32,3 +32,11 @@
 - Implemented `src/config.ts` reading demo overrides (enforcing future demo start), top-up configurations, optional FX rates, and `kenyaMidnightUnix` calculating UTC+3 00:00:00 timestamp.
 - Implemented `src/cost.ts` calculating separate line items: stipends, rent (via `ChainInterface`), fees, trainer top-ups, and optional combined USD estimate.
 - Added tests in `test/cost.test.ts` verifying exact lamport values for accounts, sensitivity to mock rent changes, and rate behavior.
+
+## S6 - Organizer auth (wallet-signature)
+- Implemented `src/session.ts` and `src/routes/auth.ts` handling wallet signature authentication (ed25519 via `tweetnacl`).
+- Note on signature encoding: `signature` accepted in POST `/auth/verify` is encoded in **base58** (`bs58`).
+- Nonce storage in `sessions` table: max 5 active nonces per wallet, expired nonces cleaned up on nonce generation.
+- Nonces are consumed only upon successful verification; failed verification leaves nonce usable until expiry.
+- Session cookie uses `HttpOnly`, `SameSite=Lax`, and `Secure` by default (disabled only if `COOKIE_SECURE='false'`).
+

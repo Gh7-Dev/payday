@@ -63,10 +63,9 @@ export function makeAuthRoutes(db: DatabaseSync) {
       return c.json({ error: 'invalid_signature' }, 401);
     }
 
-    // Determine if we're in a localhost context (no Secure flag needed)
-    const host = c.req.header('host') ?? '';
-    const isLocalhost = host.startsWith('localhost') || host.startsWith('127.') || host.startsWith('[::1]');
-    const secure = isLocalhost ? '' : '; Secure';
+    // Secure cookie flag comes from env COOKIE_SECURE (secure by default; only 'false' turns it off)
+    const isSecure = process.env.COOKIE_SECURE !== 'false';
+    const secure = isSecure ? '; Secure' : '';
 
     const maxAge = 43200;
     c.header(
