@@ -11,3 +11,4 @@
 | `tweetnacl` | ed25519 sign/verify for Solana wallet signature authentication | ^1.0.3 | https://github.com/dchest/tweetnacl-js |
 | `bs58` | Base58 encoding/decoding for Solana public keys | ^6.0.0 | https://github.com/cryptocoinjs/bs58 |
 | `base-x` | Generic base-N encoding/decoding (transitive dep of bs58) | ^4.0.0 | https://github.com/cryptocoinjs/base-x |
+| `node:crypto` (`scrypt`) | Built-in Node crypto module for scrypt password/PIN hashing. Parameter memory usage calculation `128 * N * r` requires setting `maxmem` (default 32MB) to at least 128MB+ (e.g. 256MB) for N=2^17, r=8 | Node 22 built-in | https://nodejs.org/docs/latest-v22.x/api/crypto.html#cryptoscryptpassword-salt-keylen-options-callback |
