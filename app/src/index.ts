@@ -5,6 +5,7 @@ import { MockChain } from './chain/mock.js';
 import { makeAuthRoutes } from './routes/auth.js';
 import { makeOrganizerRoutes } from './routes/organizer.js';
 import { makeClaimRoutes } from './routes/claim.js';
+import { makeTrainerRoutes } from './routes/trainer.js';
 import { makeRelayRoutes } from './routes/relay.js';
 import type { RelayOptions } from './routes/relay.js';
 import { Limiter } from './limiter.js';
@@ -23,8 +24,9 @@ export function createApp(
   });
 
   app.route('/auth', makeAuthRoutes(db));
-  // Must stay BEFORE the organizer router: its use('*') middleware would otherwise 401 trainees.
+  // Must stay BEFORE the organizer router: its use('*') middleware would otherwise 401 trainees/trainers.
   app.route('/claim', makeClaimRoutes(db, chain, guard));
+  app.route('/trainer', makeTrainerRoutes(db, chain, guard));
   app.route('/relay', makeRelayRoutes(db, chain, relayOpts));
   app.route('/', makeOrganizerRoutes(db, chain));
 
