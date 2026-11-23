@@ -139,4 +139,107 @@ describe('claim flow', () => {
     assert.equal((await claim(w.app, { pin: '12345' })).status, 400);
     assert.equal((await claim(w.app, { wallet: 'not-a-wallet!!' })).status, 400);
   });
+
+  test('unlock after a claim returns the same wallet and blob', async () => {
+    const w = world();
+    const wallet = newWallet();
+    const cr = await claim(w.app, { wallet });
+    assert.equal(cr.status, 200);
+
+    const res = await w.app.request('/claim/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ linkCode: CODE, phone: '0712345678', pin: '123456' }),
+    });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as any;
+    assert.equal(body.wallet, wallet);
+    assert.equal(body.encryptedKeyBlob, BLOB);
+  });
+
+  test('unlock with wrong PIN gives 401', async () => {
+    const w = world();
+    const wallet = newWallet();
+    await claim(w.app, { wallet });
+
+    const res = await w.app.request('/claim/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ linkCode: CODE, phone: '0712345678', pin: '000000' }),
+    });
+    assert.equal(res.status, 401);
+  });
+
+  test('unlock before enrolled (pending) gives 409', async () => {
+    const w = world({ fund: false });
+    const wallet = newWallet();
+    const cr = await claim(w.app, { wallet });
+    assert.equal(cr.status, 502);
+
+    const res = await w.app.request('/claim/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ linkCode: CODE, phone: '0712345678', pin: '123456' }),
+    });
+    assert.equal(res.status, 409);
+  });
+
+  test('unlock with phone not on the list gives 404', async () => {
+    const w = world();
+    const res = await w.app.request('/claim/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ linkCode: CODE, phone: '0799999999', pin: '123456' }),
+    });
+    assert.equal(res.status, 404);
+  });
+
+  test('5 wrong PINs from one IP then 429', async () => {
+    const w = world();
+    const wallet = newWallet();
+    await claim(w.app, { wallet });
+
+    for (let i = 0; i < 5; i++) {
+      const res = await w.app.request('/claim/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '4.4.4.4' },
+        body: JSON.stringify({ linkCode: CODE, phone: '0712345678', pin: '000000' }),
+      });
+      assert.equal(res.status, 401);
+    }
+
+    const locked = await w.app.request('/claim/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '4.4.4.4' },
+      body: JSON.stringify({ linkCode: CODE, phone: '0712345678', pin: '123456' }),
+    });
+    assert.equal(locked.status, 429);
+  });
+
+  test("participant 2's phone with participant 1's PIN gives 401 and never returns participant 1's data", async () => {
+    const w = world();
+    const w1 = newWallet();
+    const w2 = newWallet();
+    const b1 = 'blob1blob1==';
+    const b2 = 'blob2blob2==';
+
+    // Claim p1 with PIN 111111
+    const cr1 = await claim(w.app, { phone: '0712345678', pin: '111111', wallet: w1, encryptedKeyBlob: b1 });
+    assert.equal(cr1.status, 200);
+
+    // Claim p2 with PIN 222222
+    const cr2 = await claim(w.app, { phone: '0722345678', pin: '222222', wallet: w2, encryptedKeyBlob: b2 });
+    assert.equal(cr2.status, 200);
+
+    // Unlock p2 using p1's PIN (111111)
+    const res = await w.app.request('/claim/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ linkCode: CODE, phone: '0722345678', pin: '111111' }),
+    });
+    assert.equal(res.status, 401);
+    const body = (await res.json()) as any;
+    assert.notEqual(body.wallet, w1);
+    assert.notEqual(body.encryptedKeyBlob, b1);
+  });
 });

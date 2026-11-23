@@ -14,6 +14,7 @@ interface ParticipantRow {
   id: string;
   claim_state: 'unclaimed' | 'pending' | 'enrolled';
   wallet_address: string | null;
+  encrypted_key_blob: string | null;
   pin_hash: string | null;
   amounts: string;
 }
@@ -127,6 +128,55 @@ export function makeClaimRoutes(db: DatabaseSync, chain: ChainInterface, guard: 
       .run(Math.floor(Date.now() / 1000), row.id);
     guard.success(ip, key);
     return c.json({ state: 'enrolled' }, 200);
+  });
+
+  router.post('/unlock', async (c) => {
+    const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object') return c.json({ error: 'bad_request' }, 400);
+    const { linkCode, phone, pin } = body;
+    if (typeof linkCode !== 'string' || typeof phone !== 'string' || typeof pin !== 'string') {
+      return c.json({ error: 'bad_request' }, 400);
+    }
+
+    const ip = clientIp(c);
+    let norm: string | null = null;
+    try { norm = normalizeKenyaPhone(phone) ?? null; } catch { norm = null; }
+    const key = norm ?? 'invalid';
+    if (guard.check(ip, key) === true) return c.json({ error: 'too_many_attempts' }, 429);
+
+    const link = db
+      .prepare(`SELECT event_id FROM claim_links WHERE link_type = 'trainee' AND code IN (?, ?, ?)`)
+      .get(...linkHashes(linkCode)) as { event_id: string } | undefined;
+    if (!link) { guard.fail(ip, key); return c.json({ error: 'unknown_link' }, 404); }
+
+    if (!norm) { guard.fail(ip, key); return c.json({ error: 'not_on_list' }, 404); }
+    const row = db
+      .prepare(`SELECT id, claim_state, wallet_address, encrypted_key_blob, pin_hash FROM participants WHERE event_id = ? AND phone_e164 = ?`)
+      .get(link.event_id, norm) as ParticipantRow | undefined;
+    if (!row) { guard.fail(ip, key); return c.json({ error: 'not_on_list' }, 404); }
+
+    if (!PIN_RE.test(pin)) return c.json({ error: 'bad_pin_format' }, 400);
+
+    if (row.claim_state !== 'enrolled') return c.json({ error: 'not_enrolled' }, 409);
+
+    let ok = false;
+    try {
+      ok = row.pin_hash ? await verifySecret(pin, row.pin_hash) : false;
+    } catch (e) {
+      if (e instanceof HashBusyError) return c.json({ error: 'busy' }, 503);
+      throw e;
+    }
+
+    if (!ok) {
+      guard.fail(ip, key);
+      return c.json({ error: 'wrong_pin' }, 401);
+    }
+
+    guard.success(ip, key);
+    return c.json({
+      wallet: row.wallet_address,
+      encryptedKeyBlob: row.encrypted_key_blob,
+    }, 200);
   });
 
   return router;
