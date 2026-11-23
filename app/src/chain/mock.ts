@@ -184,6 +184,10 @@ export class MockChain implements ChainInterface {
     this.programme.committed = 0n;
   }
 
+  async isEnrolled(wallet: string): Promise<boolean> {
+    return this.enrollments.has(wallet);
+  }
+
   getWalletBalance(wallet: string): bigint {
     return this.walletBalances.get(wallet) ?? 0n;
   }

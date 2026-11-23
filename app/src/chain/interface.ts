@@ -35,4 +35,5 @@ export interface ChainInterface {
   isTrainerRegistered(wallet: string): Promise<boolean>;
   enroll(trainee: string, amounts: bigint[]): Promise<void>;
   topUp(wallet: string, lamports?: bigint): Promise<void>;
+  isEnrolled(wallet: string): Promise<boolean>;
 }
