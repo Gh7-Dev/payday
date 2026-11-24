@@ -171,42 +171,116 @@ export function makeTrainerRoutes(db: DatabaseSync, chain: ChainInterface, guard
     const topupAmount = cfg.trainerTopupLamports;
     const totalCap = cfg.topupTotalCapLamports;
 
-    // Sum of topped_up_lamports over the event's trainers
-    const sumRow = db
-      .prepare(`SELECT topped_up_lamports FROM trainers WHERE event_id = ? AND topped_up_lamports IS NOT NULL`)
-      .all(link.event_id) as Array<{ topped_up_lamports: string }>;
+    // Reserve before the chain call:
+    // Run ONE conditional UPDATE that sets topped_up_at and topped_up_lamports only
+    // WHERE id=? AND topped_up_at IS NULL AND (SELECT COALESCE(SUM(CAST(topped_up_lamports AS INTEGER)),0) FROM trainers WHERE event_id=? AND topped_up_at IS NOT NULL) + amount <= cap;
+    // if no row changed, answer 409 {error:'topup_cap'} (or the already-topped-up case).
+    const nowReservation = Math.floor(Date.now() / 1000);
+    const reserveRes = db
+      .prepare(
+        `UPDATE trainers
+         SET topped_up_at = ?, topped_up_lamports = ?
+         WHERE id = ?
+           AND topped_up_at IS NULL
+           AND (SELECT COALESCE(SUM(CAST(topped_up_lamports AS INTEGER)), 0) FROM trainers WHERE event_id = ? AND topped_up_at IS NOT NULL) + ? <= ?`
+      )
+      .run(nowReservation, topupAmount.toString(), row.id, link.event_id, Number(topupAmount), Number(totalCap));
 
-    let eventTotalToppedUp = 0n;
-    for (const r of sumRow) {
-      if (r.topped_up_lamports) {
-        try {
-          eventTotalToppedUp += BigInt(r.topped_up_lamports);
-        } catch {
-          // ignore
-        }
+    if (Number(reserveRes.changes) === 0) {
+      // Check if already topped up
+      const checkRow = db.prepare(`SELECT state, topped_up_at FROM trainers WHERE id = ?`).get(row.id) as { state: string; topped_up_at: number | null } | undefined;
+      if (checkRow && checkRow.topped_up_at !== null) {
+        guard.success(ip, key);
+        return c.json({ state: checkRow.state }, 200);
       }
-    }
-
-    if (eventTotalToppedUp + topupAmount > totalCap) {
-      // stay signed_up and return 409 { error: 'topup_cap' }
       return c.json({ error: 'topup_cap' }, 409);
     }
 
     try {
       await chain.topUp(wallet, topupAmount);
     } catch (e) {
+      // on ChainError, release the reservation (set topped_up_at and topped_up_lamports back to NULL),
+      // keep state 'signed_up' and return 502 with its code
+      db.prepare(`UPDATE trainers SET topped_up_at = NULL, topped_up_lamports = NULL WHERE id = ?`).run(row.id);
       const code = (e as { code?: unknown })?.code;
       if (typeof code === 'string') return c.json({ error: code }, 502);
       throw e;
     }
 
-    const now = Math.floor(Date.now() / 1000);
-    db.prepare(
-      `UPDATE trainers SET state = 'funded', topped_up_at = ?, topped_up_lamports = ? WHERE id = ?`
-    ).run(now, topupAmount.toString(), row.id);
+    db.prepare(`UPDATE trainers SET state = 'funded' WHERE id = ?`).run(row.id);
 
     guard.success(ip, key);
     return c.json({ state: 'funded' }, 200);
+  });
+
+  router.post('/unlock', async (c) => {
+    const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object') return c.json({ error: 'bad_request' }, 400);
+
+    const { linkCode, username, password } = body;
+    if (
+      typeof linkCode !== 'string' ||
+      typeof username !== 'string' ||
+      typeof password !== 'string'
+    ) {
+      return c.json({ error: 'bad_request' }, 400);
+    }
+
+    const ip = clientIp(c);
+    const key = username;
+
+    if (guard.check(ip, key) === true) return c.json({ error: 'too_many_attempts' }, 429);
+
+    const link = db
+      .prepare(`SELECT event_id FROM claim_links WHERE link_type = 'trainer' AND code IN (?, ?, ?)`)
+      .get(...linkHashes(linkCode)) as { event_id: string } | undefined;
+    if (!link) {
+      guard.fail(ip, key);
+      return c.json({ error: 'unknown_link' }, 404);
+    }
+
+    const row = db
+      .prepare(
+        `SELECT id, wallet_address, encrypted_key_blob, password_hash, state FROM trainers WHERE event_id = ? AND username = ?`
+      )
+      .get(link.event_id, username) as
+      | {
+          id: string;
+          wallet_address: string | null;
+          encrypted_key_blob: string | null;
+          password_hash: string | null;
+          state: string;
+        }
+      | undefined;
+
+    if (!row) {
+      guard.fail(ip, key);
+      return c.json({ error: 'not_found' }, 404);
+    }
+
+    if (row.state !== 'signed_up' && row.state !== 'funded' && row.state !== 'registered') {
+      return c.json({ error: 'invalid_state' }, 409);
+    }
+
+    let ok = false;
+    try {
+      ok = row.password_hash ? await verifySecret(password, row.password_hash) : false;
+    } catch (e) {
+      if (e instanceof HashBusyError) return c.json({ error: 'busy' }, 503);
+      throw e;
+    }
+
+    if (!ok) {
+      guard.fail(ip, key);
+      return c.json({ error: 'wrong_password' }, 401);
+    }
+
+    guard.success(ip, key);
+    return c.json({
+      wallet: row.wallet_address,
+      encryptedKeyBlob: row.encrypted_key_blob,
+      state: row.state,
+    }, 200);
   });
 
   return router;

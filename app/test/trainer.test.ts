@@ -270,4 +270,258 @@ describe('trainer signup flow', () => {
     const res4 = await signup(w.app, { username: 'alice-bad-hyphen' });
     assert.equal(res4.status, 400);
   });
+
+  test('two concurrent signups with a cap that fits only one: exactly one is topped up and the other gets 409 topup_cap', async () => {
+    const origCap = process.env.TOPUP_TOTAL_CAP_LAMPORTS;
+    try {
+      process.env.TOPUP_TOTAL_CAP_LAMPORTS = '10000000'; // Only fits 1 trainer
+      const w = world();
+
+      const wallet1 = newWallet();
+      const wallet2 = newWallet();
+
+      const [res1, res2] = await Promise.all([
+        signup(w.app, { phone: '0712345678', username: 'trainer_one', wallet: wallet1 }, '1.1.1.1'),
+        signup(w.app, { phone: '0722345678', username: 'trainer_two', wallet: wallet2 }, '1.1.1.2'),
+      ]);
+
+      const statuses = [res1.status, res2.status].sort();
+      assert.deepEqual(statuses, [200, 409]);
+
+      const capRes = res1.status === 409 ? res1 : res2;
+      assert.equal(capRes.json.error, 'topup_cap');
+
+      const okRes = res1.status === 200 ? res1 : res2;
+      assert.equal(okRes.json.state, 'funded');
+
+      const b1 = w.chain.getWalletBalance(wallet1);
+      const b2 = w.chain.getWalletBalance(wallet2);
+      assert.ok((b1 === 10_000_000n && b2 === 0n) || (b1 === 0n && b2 === 10_000_000n));
+    } finally {
+      if (origCap !== undefined) {
+        process.env.TOPUP_TOTAL_CAP_LAMPORTS = origCap;
+      } else {
+        delete process.env.TOPUP_TOTAL_CAP_LAMPORTS;
+      }
+    }
+  });
+
+  test('a failed topUp releases the reservation so the retry succeeds and a second trainer can still use the cap', async () => {
+    const origCap = process.env.TOPUP_TOTAL_CAP_LAMPORTS;
+    try {
+      // Cap fits 2 trainers: 20_000_000n
+      process.env.TOPUP_TOTAL_CAP_LAMPORTS = '20000000';
+      const w = world();
+
+      let shouldFail = true;
+      const origTopUp = w.chain.topUp.bind(w.chain);
+      w.chain.topUp = async (wallet, lamports) => {
+        if (shouldFail) {
+          throw new ChainError('RpcError', 'timeout');
+        }
+        return origTopUp(wallet, lamports);
+      };
+
+      const wallet1 = newWallet();
+      const res1 = await signup(w.app, { phone: '0712345678', username: 'trainer_one', wallet: wallet1 }, '1.1.1.1');
+      assert.equal(res1.status, 502);
+
+      // Verify reservation was released in DB
+      const row1 = w.db.prepare('SELECT state, topped_up_at, topped_up_lamports FROM trainers WHERE id = ?').get(w.t1) as any;
+      assert.equal(row1.state, 'signed_up');
+      assert.equal(row1.topped_up_at, null);
+      assert.equal(row1.topped_up_lamports, null);
+
+      // Stop chain failure
+      shouldFail = false;
+
+      // Retry signup for trainer 1
+      const res1Retry = await signup(w.app, { phone: '0712345678', username: 'trainer_one', wallet: wallet1 }, '1.1.1.1');
+      assert.equal(res1Retry.status, 200);
+      assert.equal(res1Retry.json.state, 'funded');
+
+      // Now trainer 2 can still use the cap
+      const wallet2 = newWallet();
+      const res2 = await signup(w.app, { phone: '0722345678', username: 'trainer_two', wallet: wallet2 }, '1.1.1.2');
+      assert.equal(res2.status, 200);
+      assert.equal(res2.json.state, 'funded');
+
+      assert.equal(w.chain.getWalletBalance(wallet1), 10_000_000n);
+      assert.equal(w.chain.getWalletBalance(wallet2), 10_000_000n);
+    } finally {
+      if (origCap !== undefined) {
+        process.env.TOPUP_TOTAL_CAP_LAMPORTS = origCap;
+      } else {
+        delete process.env.TOPUP_TOTAL_CAP_LAMPORTS;
+      }
+    }
+  });
+
+  test('unlock ok / wrong password 401 / invited 409', async () => {
+    const w = world();
+    const wallet = newWallet();
+
+    // 1. Trainer 2 is in 'invited' state -> unlock gives 409 (invalid_state)
+    const resInvited = await w.app.request('/trainer/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        linkCode: TRAINER_CODE,
+        username: 'nonexistent_or_invited',
+        password: 'password123',
+      }),
+    });
+    // For invited trainer with username
+    w.db.prepare("UPDATE trainers SET username = 'invited_user' WHERE id = ?").run(w.t2);
+    const resInvited2 = await w.app.request('/trainer/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        linkCode: TRAINER_CODE,
+        username: 'invited_user',
+        password: 'password123',
+      }),
+    });
+    assert.equal(resInvited2.status, 409);
+    const jsonInvited = await resInvited2.json();
+    assert.equal(jsonInvited.error, 'invalid_state');
+
+    // 2. Sign up trainer 1 so they are funded
+    const signupRes = await signup(w.app, {
+      phone: '0712345678',
+      username: 'alice_trainer',
+      password: 'mypassword123',
+      wallet,
+      encryptedKeyBlob: BLOB,
+    });
+    assert.equal(signupRes.status, 200);
+
+    // 3. Unlock with wrong password -> 401
+    const resWrong = await w.app.request('/trainer/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        linkCode: TRAINER_CODE,
+        username: 'alice_trainer',
+        password: 'wrongpassword123',
+      }),
+    });
+    assert.equal(resWrong.status, 401);
+    const jsonWrong = await resWrong.json();
+    assert.equal(jsonWrong.error, 'wrong_password');
+
+    // 4. Unlock with correct password -> 200 { wallet, encryptedKeyBlob, state }
+    const resOk = await w.app.request('/trainer/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        linkCode: TRAINER_CODE,
+        username: 'alice_trainer',
+        password: 'mypassword123',
+      }),
+    });
+    assert.equal(resOk.status, 200);
+    const jsonOk = await resOk.json();
+    assert.equal(jsonOk.wallet, wallet);
+    assert.equal(jsonOk.encryptedKeyBlob, BLOB);
+    assert.equal(jsonOk.state, 'funded');
+  });
+
+  test('sync marks a trainer registered only after mock.addTrainer(wallet); sync for another wallet\'s event 404; no session on sync 401', async () => {
+    const w = world();
+    const organizerWallet = (w.db.prepare('SELECT organizer_wallet FROM events WHERE id = ?').get(w.eventId) as any).organizer_wallet;
+
+    // Helper to create valid session token for organizerWallet
+    const sessionToken = 'test-session-' + randomUUID();
+    const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
+    const now = Math.floor(Date.now() / 1000);
+    w.db.prepare('INSERT INTO sessions (id, wallet_address, nonce, expires_at, created_at) VALUES (?, ?, ?, ?, ?)').run(
+      tokenHash,
+      organizerWallet,
+      '',
+      now + 3600,
+      now
+    );
+
+    // Another organizer wallet session
+    const otherWallet = newWallet();
+    const otherToken = 'other-session-' + randomUUID();
+    const otherTokenHash = createHash('sha256').update(otherToken).digest('hex');
+    w.db.prepare('INSERT INTO sessions (id, wallet_address, nonce, expires_at, created_at) VALUES (?, ?, ?, ?, ?)').run(
+      otherTokenHash,
+      otherWallet,
+      '',
+      now + 3600,
+      now
+    );
+
+    // Initialize mock chain programme so addTrainer works
+    w.chain.createProgramme({
+      organizer: organizerWallet,
+      backendKey: newWallet(),
+      mint: newWallet(),
+      programmeId: 'prog123',
+      startTs: 1000n,
+      dayLen: 86400n,
+      days: 5,
+      maxParticipants: 10,
+    });
+
+    // Sign up trainer 1 -> funded
+    const wallet1 = newWallet();
+    const s1 = await signup(w.app, { phone: '0712345678', username: 'trainer_one', wallet: wallet1 });
+    assert.equal(s1.status, 200);
+    assert.equal(s1.json.state, 'funded');
+
+    // 1. No session on sync -> 401
+    const resNoAuth = await w.app.request(`/events/${w.eventId}/trainers/sync`, {
+      method: 'POST',
+    });
+    assert.equal(resNoAuth.status, 401);
+
+    // 2. Sync for another wallet's event -> 404
+    const resOther = await w.app.request(`/events/${w.eventId}/trainers/sync`, {
+      method: 'POST',
+      headers: { Cookie: `session=${otherToken}` },
+    });
+    assert.equal(resOther.status, 404);
+
+    // 3. Sync before addTrainer -> trainer is pending, not registered
+    const resSyncBefore = await w.app.request(`/events/${w.eventId}/trainers/sync`, {
+      method: 'POST',
+      headers: { Cookie: `session=${sessionToken}` },
+    });
+    assert.equal(resSyncBefore.status, 200);
+    const jsonSyncBefore = await resSyncBefore.json();
+    assert.deepEqual(jsonSyncBefore.registered, []);
+    assert.deepEqual(jsonSyncBefore.pending, ['Alice Trainer']);
+
+    let row = w.db.prepare('SELECT state FROM trainers WHERE id = ?').get(w.t1) as any;
+    assert.equal(row.state, 'funded');
+
+    // 4. Add trainer on chain and sync again -> now registered
+    w.chain.addTrainer(wallet1);
+
+    const resSyncAfter = await w.app.request(`/events/${w.eventId}/trainers/sync`, {
+      method: 'POST',
+      headers: { Cookie: `session=${sessionToken}` },
+    });
+    assert.equal(resSyncAfter.status, 200);
+    const jsonSyncAfter = await resSyncAfter.json();
+    assert.deepEqual(jsonSyncAfter.registered, ['Alice Trainer']);
+    assert.deepEqual(jsonSyncAfter.pending, []);
+
+    row = w.db.prepare('SELECT state FROM trainers WHERE id = ?').get(w.t1) as any;
+    assert.equal(row.state, 'registered');
+
+    // Sync once more: now trainer state is registered (not funded), so not re-returned in sync
+    const resSyncAgain = await w.app.request(`/events/${w.eventId}/trainers/sync`, {
+      method: 'POST',
+      headers: { Cookie: `session=${sessionToken}` },
+    });
+    assert.equal(resSyncAgain.status, 200);
+    const jsonSyncAgain = await resSyncAgain.json();
+    assert.deepEqual(jsonSyncAgain.registered, []);
+    assert.deepEqual(jsonSyncAgain.pending, []);
+  });
 });

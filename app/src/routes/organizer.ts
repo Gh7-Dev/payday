@@ -382,5 +382,42 @@ export function makeOrganizerRoutes(db: DatabaseSync, chain: ChainInterface) {
     }, 200);
   });
 
+  // 6) POST /events/:id/trainers/sync
+  router.post('/events/:id/trainers/sync', async (c) => {
+    const organizerWallet = c.get('wallet');
+    const eventId = c.req.param('id');
+    const event = getOrganizerEvent(eventId, organizerWallet);
+    if (!event) {
+      return c.json({ error: 'not_found' }, 404);
+    }
+
+    const trainers = db.prepare(
+      `SELECT id, name, wallet_address FROM trainers WHERE event_id = ? AND state = 'funded' AND wallet_address IS NOT NULL`
+    ).all(eventId) as Array<{ id: string; name: string; wallet_address: string }>;
+
+    const registered: string[] = [];
+    const pending: string[] = [];
+
+    const updateStmt = db.prepare(`UPDATE trainers SET state = 'registered' WHERE id = ?`);
+
+    for (const t of trainers) {
+      let isReg = false;
+      try {
+        isReg = await chain.isTrainerRegistered(t.wallet_address);
+      } catch {
+        isReg = false;
+      }
+
+      if (isReg) {
+        updateStmt.run(t.id);
+        registered.push(t.name);
+      } else {
+        pending.push(t.name);
+      }
+    }
+
+    return c.json({ registered, pending }, 200);
+  });
+
   return router;
 }
