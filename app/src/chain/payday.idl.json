@@ -1,0 +1,253 @@
+{
+  "address": "G9aiEGjhe5ya51k6mujpbzd1LkwadKMq9uPhEr97qXaM",
+  "metadata": {
+    "name": "payday",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "create_programme",
+      "discriminator": [
+        11,
+        102,
+        203,
+        143,
+        95,
+        168,
+        15,
+        167
+      ],
+      "accounts": [
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "programme",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "organizer"
+              },
+              {
+                "kind": "arg",
+                "path": "programme_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "programme"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "programme_id",
+          "type": "u64"
+        },
+        {
+          "name": "backend_key",
+          "type": "pubkey"
+        },
+        {
+          "name": "start_ts",
+          "type": "i64"
+        },
+        {
+          "name": "day_len",
+          "type": "i64"
+        },
+        {
+          "name": "days",
+          "type": "u8"
+        },
+        {
+          "name": "max_participants",
+          "type": "u16"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Programme",
+      "discriminator": [
+        116,
+        227,
+        195,
+        246,
+        39,
+        82,
+        62,
+        127
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidDays",
+      "msg": "Enter a valid day"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidDayLength",
+      "msg": "Enter a day length between 1 to 31"
+    },
+    {
+      "code": 6002,
+      "name": "StartInPast",
+      "msg": "Event cannot start in the past"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidCapacity",
+      "msg": "Enter at least 1 participant"
+    }
+  ],
+  "types": [
+    {
+      "name": "Programme",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "organizer",
+            "type": "pubkey"
+          },
+          {
+            "name": "backend_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "programme_id",
+            "type": "u64"
+          },
+          {
+            "name": "start_ts",
+            "type": "i64"
+          },
+          {
+            "name": "day_len",
+            "type": "i64"
+          },
+          {
+            "name": "days",
+            "type": "u8"
+          },
+          {
+            "name": "max_participants",
+            "type": "u16"
+          },
+          {
+            "name": "enrolled",
+            "type": "u16"
+          },
+          {
+            "name": "total_funded",
+            "type": "u64"
+          },
+          {
+            "name": "total_paid",
+            "type": "u64"
+          },
+          {
+            "name": "total_reclaimed",
+            "type": "u64"
+          },
+          {
+            "name": "committed",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "reclaimed",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "MAX_COUNT",
+      "type": "u64",
+      "value": "10"
+    },
+    {
+      "name": "PROGRAMME_SEED",
+      "type": "bytes",
+      "value": "[112, 114, 111, 103, 114, 97, 109, 109, 101]"
+    },
+    {
+      "name": "TRAINER_SEED",
+      "type": "bytes",
+      "value": "[116, 114, 97, 105, 110, 101, 114]"
+    },
+    {
+      "name": "VAULT_SEED",
+      "type": "bytes",
+      "value": "[118, 97, 117, 108, 116]"
+    }
+  ]
+}
