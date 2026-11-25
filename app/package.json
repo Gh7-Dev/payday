@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "check": "node run-check.js",
+    "dev": "node --env-file=.env --import tsx src/server.ts",
+    "start": "node --env-file=.env --import tsx src/server.ts",
     "test": "node --test --import tsx test/**/*.test.ts"
   },
   "dependencies": {

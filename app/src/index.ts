@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import type { DatabaseSync } from 'node:sqlite';
 import type { ChainInterface } from './chain/interface.js';
 import { MockChain } from './chain/mock.js';
@@ -18,6 +19,22 @@ export function createApp(
   relayOpts: RelayOptions = {},
 ) {
   const app = new Hono<{ Variables: { wallet: string; db: DatabaseSync } }>();
+
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? 'http://localhost:5173')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  app.use(
+    '*',
+    cors({
+      origin: (origin) => {
+        if (!origin) return null;
+        return allowedOrigins.includes(origin) ? origin : null;
+      },
+      credentials: true,
+    }),
+  );
 
   app.get('/health', (c) => {
     return c.json({ status: 'ok' }, 200);
