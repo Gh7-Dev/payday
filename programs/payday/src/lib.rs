@@ -18,6 +18,9 @@ pub mod payday {
     pub fn create_programme(ctx: Context<CreateProgramme>,programme_id: u64, backend_key: Pubkey, start_ts: i64, day_len: i64, days: u8, max_participants: u16) -> Result<()>{
         create_programme::handler(ctx, programme_id, backend_key, start_ts, day_len, days, max_participants)
     }
+    pub fn fund (ctx:Context<Fund>, programme_id : u64 ,amount: u64) -> Result<()> {
+        fund::handler(ctx,programme_id, amount)
+    }
 
     /*pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         crate::instructions::initialize::handle_initialize(ctx)

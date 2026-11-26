@@ -10,6 +10,14 @@ pub enum PayDayError {
     StartInPast,
     #[msg("Enter at least 1 participant")]
     InvalidCapacity,
+    #[msg("Not Authorized to transact!" )]
+    Unauthorized,
+    #[msg("The transaction would cause an overflow in the account")]
+    MathOverflow,
+    #[msg("The Event is already closed")]
+    ProgrammeClosed,
+    #[msg("You cannot fund a zero amount")]
+    ZeroAmount,
 
 
 }
