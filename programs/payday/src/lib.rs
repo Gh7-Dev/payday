@@ -22,6 +22,10 @@ pub mod payday {
         fund::handler(ctx,programme_id, amount)
     }
 
+    pub fn add_trainer(ctx:Context<AddTrainer>, programme_id : u64) -> Result<()> {
+        add_trainer::handler(ctx)
+    }
+
     /*pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         crate::instructions::initialize::handle_initialize(ctx)
     }

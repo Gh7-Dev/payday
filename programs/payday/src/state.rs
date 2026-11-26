@@ -20,3 +20,11 @@ pub struct Programme {
     pub vault_bump : u8,
     pub reclaimed : bool,
 }
+
+#[account]
+#[derive(InitSpace)]
+pub struct Trainer {
+    pub programme : Pubkey,
+    pub trainer : Pubkey,
+    pub bump : u8,
+}
