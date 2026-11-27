@@ -1,23 +1,44 @@
+
 use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum PayDayError {
-    #[msg("Enter a valid day")]
+    #[msg("Enter a valid number of days")]
     InvalidDays,
-    #[msg("Enter a day length between 1 to 31")]
-    InvalidDayLength,    
-    #[msg("Event cannot start in the past")]
+
+    #[msg("Enter a day length between 1 and 31")]
+    InvalidDayLength,
+
+    #[msg("The programme cannot start in the past")]
     StartInPast,
-    #[msg("Enter at least 1 participant")]
+
+    #[msg("Enter at least one participant")]
     InvalidCapacity,
-    #[msg("Not Authorized to transact!" )]
+
+    #[msg("You are not authorized to perform this operation")]
     Unauthorized,
-    #[msg("The transaction would cause an overflow in the account")]
+
+    #[msg("Only the authorized backend can enroll trainees")]
+    InvalidBackend,
+
+    #[msg("The transaction would cause an arithmetic overflow")]
     MathOverflow,
-    #[msg("The Event is already closed")]
+
+    #[msg("The programme is already closed")]
     ProgrammeClosed,
-    #[msg("You cannot fund a zero amount")]
+
+    #[msg("The programme has ended and cannot accept new enrollments")]
+    ProgrammeEnded,
+
+    #[msg("The programme has reached its maximum participant capacity")]
+    ProgrammeFull,
+
+    #[msg("The funding amount cannot be zero")]
     ZeroAmount,
 
+    #[msg("The payment schedule length must match the programme duration")]
+    WrongScheduleLength,
 
+    #[msg("The programme vault has insufficient funds for this commitment")]
+    InsufficientFunding,
 }

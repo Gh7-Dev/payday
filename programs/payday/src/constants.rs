@@ -10,4 +10,4 @@ pub const VAULT_SEED: &[u8] = b"vault";
 pub const TRAINER_SEED: &[u8] = b"trainer";
 
 #[constant]
-pub const MAX_COUNT: u64 = 10;
+pub const ENROLLMENT_SEED: &[u8] = b"enrollment";

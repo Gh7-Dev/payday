@@ -28,3 +28,13 @@ pub struct Trainer {
     pub trainer : Pubkey,
     pub bump : u8,
 }
+
+#[account]  
+pub struct Enrollment{
+    pub programme : Pubkey,
+    pub trainee: Pubkey,
+    pub attendance_mask: u32,
+    pub paid_total : u64,
+    pub amounts: Vec<u64>,
+    pub bump : u8,
+}

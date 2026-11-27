@@ -26,6 +26,10 @@ pub mod payday {
         add_trainer::handler(ctx)
     }
 
+    pub fn enroll(ctx:Context<Enroll>, amounts: Vec<u64>) -> Result<()> {
+        enroll::handler(ctx, amounts)
+    }
+
     /*pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         crate::instructions::initialize::handle_initialize(ctx)
     }
