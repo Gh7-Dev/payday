@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { Trainee } from './screens/Trainee'
+import { Trainer } from './screens/Trainer'
 import {
   Button,
   Field,
@@ -101,9 +103,9 @@ export function App() {
     case 'organizer-event':
       return <PlaceholderScreen title={`Event ${route.eventId} — coming soon`} />
     case 'trainer':
-      return <PlaceholderScreen title={`Trainer link — coming soon`} />
+      return <Trainer eventId={route.eventId} code={route.code} />
     case 'trainee':
-      return <PlaceholderScreen title={`Trainee link — coming soon`} />
+      return <Trainee eventId={route.eventId} code={route.code} />
     case 'audit':
       return <PlaceholderScreen title="Audit — coming soon" />
     case 'kit':
