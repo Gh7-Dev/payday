@@ -34,6 +34,10 @@ pub mod payday {
         check_in::handler(ctx, day)
     }
 
+    pub fn reclaim(ctx: Context<Reclaim>) -> Result<()> {
+        reclaim::handler(ctx)
+    }
+
     /*pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         crate::instructions::initialize::handle_initialize(ctx)
     }

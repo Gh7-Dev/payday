@@ -28,6 +28,7 @@ pub struct AddTrainer<'info> {
 }
 
 pub fn handler(ctx: Context<AddTrainer> )->Result<()>{
+    require!(ctx.accounts.programme.reclaimed == false, PayDayError::ProgrammeClosed);
     let trainer = &mut ctx.accounts.trainer;
     trainer.trainer = ctx.accounts.trainer_wallet.key();
     trainer.programme =ctx.accounts.programme.key();
