@@ -1,0 +1,2 @@
+# Netlify proxy: forward /api to the backend (replace the URL)
+/api/*  https://YOUR-BACKEND.onrender.com/:splat  200

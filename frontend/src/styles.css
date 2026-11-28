@@ -1,0 +1,373 @@
+/* ============================================================
+   PayDay CSS — Design tokens, base, and components
+   ============================================================ */
+
+/* --- Colour tokens ---------------------------------------- */
+:root {
+  --paper: #F6F2EA;
+  --surface: #FCFAF5;
+  --sunken: #EFE9DD;
+  --ink: #17150F;
+  --ink-2: #5E5848;
+  --ink-3: #8C8573;
+  --line: #DFD7C6;
+  --line-strong: #C9BFA9;
+  --accent: #1E4D3A;
+  --accent-hover: #163B2C;
+  --accent-soft: #E3ECE4;
+  --night: #11201A;
+  --on-night: #F6F2EA;
+  --warn: #8A5A12;
+  --warn-soft: #F3E7CF;
+  --danger: #A2362A;
+  --danger-soft: #F4DEDA;
+
+  --font-display: "Fraunces Variable", Georgia, serif;
+  --font-ui: "Inter Variable", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius: 6px;
+  --shadow-modal: 0 12px 40px rgba(23, 21, 15, 0.12);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-20: 80px;
+  --space-30: 120px;
+
+  --max-content: 1120px;
+  --max-app: 960px;
+  --max-phone: 440px;
+}
+
+/* --- Reset & Base ----------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--paper);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* --- Typography scale ------------------------------------- */
+.display {
+  font-family: var(--font-display);
+  font-size: clamp(2.75rem, 6vw, 4.75rem);
+  font-weight: 500;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-size: 2.25rem;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+h2 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+h3 {
+  font-family: var(--font-ui);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.body-text {
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.small {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Layout ----------------------------------------------- */
+.container {
+  max-width: var(--max-content);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.container-app {
+  max-width: var(--max-app);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.container-phone {
+  max-width: var(--max-phone);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+/* --- Buttons ---------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: var(--radius);
+  font-family: var(--font-ui);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 150ms ease-out, opacity 150ms ease-out;
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  opacity: 0.85;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--sunken);
+}
+
+.btn-text {
+  background: transparent;
+  color: var(--accent);
+  padding: 0;
+  height: auto;
+}
+
+.btn-text:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.btn-large {
+  height: 52px;
+  font-size: 1rem;
+}
+
+/* --- Form inputs ------------------------------------------ */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+}
+
+.field-input {
+  height: 44px;
+  padding: 0 var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 150ms ease-out;
+}
+
+.field-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.field-input::placeholder {
+  color: var(--ink-3);
+}
+
+.field-error {
+  border-color: var(--danger);
+}
+
+.field-error-message {
+  font-size: 0.8125rem;
+  color: var(--danger);
+}
+
+.field-hint {
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+
+/* --- Card ------------------------------------------------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* --- Table ------------------------------------------------ */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  background: var(--sunken);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.table .number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Notice / Banner -------------------------------------- */
+.notice {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.notice-warn {
+  border-left-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.notice-danger {
+  border-left-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* --- Reduced motion --------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}
+
+/* --- Blank page placeholder (for build verification) ------ */
+.blank-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: var(--space-6);
+  padding: var(--space-12);
+  text-align: center;
+}
+
+.blank-page h1 {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 500;
+  color: var(--accent);
+}
