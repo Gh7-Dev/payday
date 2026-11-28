@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Keypair, PublicKey } from '@solana/web3.js';
+import { Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 import BN from 'bn.js';
 import { BorshAccountsCoder } from '@anchor-lang/core';
@@ -130,12 +130,6 @@ test('RealChain offline tests with fake Connection', async () => {
   assert.equal(decodedProgramme.enrolled, 10);
   assert.equal(decodedProgramme.totalFunded, 5000000n);
   assert.equal(decodedProgramme.reclaimed, false);
-
-  // Test enroll still throws NotImplementedYet
-  await assert.rejects(
-    async () => chain.enroll('dummy', [100n]),
-    (err: any) => err instanceof ChainError && err.code === 'NotImplementedYet',
-  );
 
   // --- Tests for isEnrolled ---
   const traineeKey = Keypair.generate().publicKey;
@@ -458,5 +452,303 @@ test('RealChain buildEnrollTransaction throws BadAmount when an amount is above 
   assert.throws(
     () => chain.buildEnrollTransaction(trainee, [18446744073709551616n], mint),
     (err: any) => err instanceof ChainError && err.code === 'BadAmount',
+  );
+});
+
+// Helper to create a fake chain environment for enroll tests
+async function setupEnrollTestEnv() {
+  const feePayer = Keypair.generate();
+  const backend = Keypair.generate();
+  const progId = Keypair.generate().publicKey;
+  const progAddr = Keypair.generate().publicKey;
+  const organizerKey = Keypair.generate().publicKey;
+  const mintKey = Keypair.generate().publicKey;
+
+  const coder = new BorshAccountsCoder(idl as any);
+  const mockProgramme = {
+    organizer: organizerKey,
+    backend_key: backend.publicKey,
+    mint: mintKey,
+    programme_id: new BN(1),
+    start_ts: new BN(1700000000),
+    day_len: new BN(86400),
+    days: 5,
+    max_participants: 50,
+    enrolled: 0,
+    total_funded: new BN(1000000),
+    total_paid: new BN(0),
+    total_reclaimed: new BN(0),
+    committed: new BN(0),
+    bump: 254,
+    vault_bump: 253,
+    reclaimed: false,
+  };
+  const encodedProgramme = await coder.encode('Programme', mockProgramme);
+
+  let rawTxSent: Buffer | null = null;
+  let sendRawTxCalls = 0;
+
+  const fakeConnection: any = {
+    async getMinimumBalanceForRentExemption(bytes: number) {
+      return bytes * 1000;
+    },
+    async getLatestBlockhash() {
+      return {
+        blockhash: bs58.encode(Buffer.alloc(32, 1)),
+        lastValidBlockHeight: 12345,
+      };
+    },
+    async getFeeForMessage() {
+      return { value: 5000 };
+    },
+    async getBalance(pubkey: PublicKey) {
+      return 10_000_000; // default 10M lamports, ample for rent + fee
+    },
+    async sendRawTransaction(raw: Buffer, opts?: any) {
+      rawTxSent = raw;
+      sendRawTxCalls++;
+      return bs58.encode(Buffer.alloc(64, 3));
+    },
+    async confirmTransaction() {
+      return { value: { err: null } };
+    },
+    async getAccountInfo(pubkey: PublicKey) {
+      if (pubkey.equals(progAddr)) {
+        return {
+          data: encodedProgramme,
+          executable: false,
+          lamports: 1000000,
+          owner: progId,
+        };
+      }
+      return null;
+    },
+  };
+
+  const chain = new RealChain({
+    connection: fakeConnection,
+    feePayerSecretKey: bs58.encode(feePayer.secretKey),
+    backendKeySecretKey: bs58.encode(backend.secretKey),
+    programId: progId.toBase58(),
+    programmeAddress: progAddr.toBase58(),
+  });
+
+  return {
+    feePayer,
+    backend,
+    progId,
+    progAddr,
+    mintKey,
+    fakeConnection,
+    chain,
+    coder,
+    getRawTxSent: () => rawTxSent,
+    getSendRawTxCalls: () => sendRawTxCalls,
+  };
+}
+
+test('RealChain enroll success path with valid signature and sendRawTransaction call', async () => {
+  const env = await setupEnrollTestEnv();
+  const trainee = Keypair.generate().publicKey.toBase58();
+
+  await env.chain.enroll(trainee, [100n, 200n]);
+
+  assert.equal(env.getSendRawTxCalls(), 1);
+  const raw = env.getRawTxSent();
+  assert.ok(raw !== null);
+
+  const tx = Transaction.from(raw!);
+  assert.equal(tx.signatures.length, 1);
+  assert.equal(tx.signatures[0].publicKey.toBase58(), env.backend.publicKey.toBase58());
+  assert.ok(tx.signatures[0].signature !== null);
+});
+
+test('RealChain enroll throws BadWallet on invalid trainee string', async () => {
+  const env = await setupEnrollTestEnv();
+
+  await assert.rejects(
+    async () => env.chain.enroll('not-a-valid-wallet-address', [100n]),
+    (err: any) => err instanceof ChainError && err.code === 'BadWallet',
+  );
+  assert.equal(env.getSendRawTxCalls(), 0);
+});
+
+test('RealChain enroll throws ProgrammeMissing when programme account is null', async () => {
+  const env = await setupEnrollTestEnv();
+  env.fakeConnection.getAccountInfo = async () => null;
+  const trainee = Keypair.generate().publicKey.toBase58();
+
+  await assert.rejects(
+    async () => env.chain.enroll(trainee, [100n]),
+    (err: any) => err instanceof ChainError && err.code === 'ProgrammeMissing',
+  );
+  assert.equal(env.getSendRawTxCalls(), 0);
+});
+
+test('RealChain enroll throws BackendKeyMissing when backend keypair is missing', async () => {
+  const env = await setupEnrollTestEnv();
+  const chainWithoutBackend = new RealChain({
+    connection: env.fakeConnection,
+    feePayerSecretKey: bs58.encode(env.feePayer.secretKey),
+    programId: env.progId.toBase58(),
+    programmeAddress: env.progAddr.toBase58(),
+  });
+  const trainee = Keypair.generate().publicKey.toBase58();
+
+  await assert.rejects(
+    async () => chainWithoutBackend.enroll(trainee, [100n]),
+    (err: any) => err instanceof ChainError && err.code === 'BackendKeyMissing',
+  );
+  assert.equal(env.getSendRawTxCalls(), 0);
+});
+
+test('RealChain enroll throws InvalidBackend on backend key mismatch before sending', async () => {
+  const env = await setupEnrollTestEnv();
+  const otherBackend = Keypair.generate();
+  const chainWithWrongBackend = new RealChain({
+    connection: env.fakeConnection,
+    feePayerSecretKey: bs58.encode(env.feePayer.secretKey),
+    backendKeySecretKey: bs58.encode(otherBackend.secretKey),
+    programId: env.progId.toBase58(),
+    programmeAddress: env.progAddr.toBase58(),
+  });
+  const trainee = Keypair.generate().publicKey.toBase58();
+
+  await assert.rejects(
+    async () => chainWithWrongBackend.enroll(trainee, [100n]),
+    (err: any) => err instanceof ChainError && err.code === 'InvalidBackend',
+  );
+  assert.equal(env.getSendRawTxCalls(), 0);
+});
+
+test('RealChain enroll throws BackendUnderfunded when balance is below needed amount', async () => {
+  const env = await setupEnrollTestEnv();
+  env.fakeConnection.getBalance = async () => 1000; // Way below rent + fee
+  const trainee = Keypair.generate().publicKey.toBase58();
+
+  await assert.rejects(
+    async () => env.chain.enroll(trainee, [100n]),
+    (err: any) => err instanceof ChainError && err.code === 'BackendUnderfunded',
+  );
+  assert.equal(env.getSendRawTxCalls(), 0);
+});
+
+test('RealChain enroll maps custom errors 0x177b, 0x1778, 0x1775 from thrown error message', async () => {
+  const trainee = Keypair.generate().publicKey.toBase58();
+
+  // 0x177b = 6011 = InsufficientFunding
+  {
+    const env = await setupEnrollTestEnv();
+    env.fakeConnection.sendRawTransaction = async () => {
+      throw new Error('Simulation failed: custom program error: 0x177b');
+    };
+    await assert.rejects(
+      async () => env.chain.enroll(trainee, [100n]),
+      (err: any) => err instanceof ChainError && err.code === 'InsufficientFunding',
+    );
+  }
+
+  // 0x1778 = 6008 = ProgrammeFull
+  {
+    const env = await setupEnrollTestEnv();
+    env.fakeConnection.sendRawTransaction = async () => {
+      throw new Error('Transaction simulation failed: custom program error: 0x1778');
+    };
+    await assert.rejects(
+      async () => env.chain.enroll(trainee, [100n]),
+      (err: any) => err instanceof ChainError && err.code === 'ProgrammeFull',
+    );
+  }
+
+  // 0x1775 = 6005 = InvalidBackend
+  {
+    const env = await setupEnrollTestEnv();
+    env.fakeConnection.sendRawTransaction = async () => {
+      throw new Error('Transaction failed: custom program error: 0x1775');
+    };
+    await assert.rejects(
+      async () => env.chain.enroll(trainee, [100n]),
+      (err: any) => err instanceof ChainError && err.code === 'InvalidBackend',
+    );
+  }
+});
+
+test('RealChain enroll maps confirmation InstructionError Custom result', async () => {
+  const env = await setupEnrollTestEnv();
+  env.fakeConnection.confirmTransaction = async () => {
+    return {
+      value: {
+        err: {
+          InstructionError: [0, { Custom: 6011 }],
+        },
+      },
+    };
+  };
+  const trainee = Keypair.generate().publicKey.toBase58();
+
+  await assert.rejects(
+    async () => env.chain.enroll(trainee, [100n]),
+    (err: any) => err instanceof ChainError && err.code === 'InsufficientFunding',
+  );
+});
+
+test('RealChain enroll maps unknown error to RpcError', async () => {
+  const env = await setupEnrollTestEnv();
+  env.fakeConnection.sendRawTransaction = async () => {
+    throw new Error('Connection refused / 503 Service Unavailable');
+  };
+  const trainee = Keypair.generate().publicKey.toBase58();
+
+  await assert.rejects(
+    async () => env.chain.enroll(trainee, [100n]),
+    (err: any) => err instanceof ChainError && err.code === 'RpcError',
+  );
+});
+
+test('RealChain enroll recovers if send throws but isEnrolled returns true', async () => {
+  const env = await setupEnrollTestEnv();
+  env.fakeConnection.sendRawTransaction = async () => {
+    throw new Error('Transaction timed out');
+  };
+
+  const traineeKey = Keypair.generate().publicKey;
+  const mockEnrollment = {
+    programme: env.progAddr,
+    trainee: traineeKey,
+    attendance_mask: 0,
+    paid_total: new BN(0),
+    amounts: [new BN(100)],
+    bump: 255,
+  };
+  const encodedEnrollment = await env.coder.encode('Enrollment', mockEnrollment);
+
+  const originalGetAccountInfo = env.fakeConnection.getAccountInfo;
+  env.fakeConnection.getAccountInfo = async (pubkey: PublicKey) => {
+    if (pubkey.equals(env.progAddr)) {
+      return originalGetAccountInfo(pubkey);
+    }
+    // Enrollment PDA check returns valid account
+    return {
+      data: encodedEnrollment,
+      executable: false,
+      lamports: 1000000,
+      owner: env.progId,
+    };
+  };
+
+  // Should resolve successfully due to retry-safety
+  await env.chain.enroll(traineeKey.toBase58(), [100n]);
+});
+
+test('RealChain enroll throws mapped error if send throws and isEnrolled returns false', async () => {
+  const env = await setupEnrollTestEnv();
+  env.fakeConnection.sendRawTransaction = async () => {
+    throw new Error('Transaction timed out waiting for commitment');
+  };
+  const trainee = Keypair.generate().publicKey.toBase58();
+
+  await assert.rejects(
+    async () => env.chain.enroll(trainee, [100n]),
+    (err: any) => err instanceof ChainError && err.code === 'RpcError',
   );
 });

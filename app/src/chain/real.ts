@@ -302,7 +302,144 @@ export class RealChain implements ChainInterface {
   }
 
   async enroll(trainee: string, amounts: bigint[]): Promise<void> {
-    throw new ChainError('NotImplementedYet', 'enroll not implemented yet');
+    // 1. Invalid trainee string -> throw ChainError('BadWallet').
+    let traineePubkey: PublicKey;
+    try {
+      traineePubkey = new PublicKey(trainee);
+      if (!PublicKey.isOnCurve(traineePubkey.toBuffer())) {
+        throw new Error();
+      }
+    } catch {
+      throw new ChainError('BadWallet', 'Invalid trainee wallet address');
+    }
+
+    // 2. programme = await this.getProgramme(). null -> ChainError('ProgrammeMissing').
+    // If !this.backendKeypair -> ChainError('BackendKeyMissing').
+    // If this.backendKeypair.publicKey.toBase58() !== programme.backendKey -> ChainError('InvalidBackend').
+    const programme = await this.getProgramme();
+    if (!programme) {
+      throw new ChainError('ProgrammeMissing', 'Programme account not found');
+    }
+
+    if (!this.backendKeypair) {
+      throw new ChainError('BackendKeyMissing', 'Backend keypair is required to enroll');
+    }
+
+    if (this.backendKeypair.publicKey.toBase58() !== programme.backendKey) {
+      throw new ChainError('InvalidBackend', 'Backend key does not match programme backendKey');
+    }
+
+    // 3. tx = this.buildEnrollTransaction(new PublicKey(trainee), amounts, new PublicKey(programme.mint)).
+    const tx = this.buildEnrollTransaction(traineePubkey, amounts, new PublicKey(programme.mint));
+
+    // 4. Underfunded guard:
+    // balance = await connection.getBalance(backend pubkey).
+    // needed = getRentExempt(89 + 8 * programme.days) + getRentExempt(165) + getFeePerSignature().
+    // If balance < needed -> ChainError('BackendUnderfunded').
+    const balance = BigInt(await this.connection.getBalance(this.backendKeypair.publicKey));
+    const enrollmentRent = await this.getRentExempt(89 + 8 * programme.days);
+    const ataRent = await this.getRentExempt(165);
+    const fee = await this.getFeePerSignature();
+    const needed = enrollmentRent + ataRent + fee;
+
+    if (balance < needed) {
+      throw new ChainError('BackendUnderfunded', `Backend balance ${balance} is below needed ${needed}`);
+    }
+
+    // Helper to map errors from text / objects to ChainError
+    const mapToChainError = (err: any): ChainError => {
+      let code: number | null = null;
+
+      // Check confirmation err object: { InstructionError: [i, { Custom: n }] }
+      if (err && typeof err === 'object') {
+        const instructionError = err.InstructionError ?? (err.err && err.err.InstructionError);
+        if (Array.isArray(instructionError) && instructionError.length >= 2) {
+          const detail = instructionError[1];
+          if (detail && typeof detail === 'object' && typeof detail.Custom === 'number') {
+            code = detail.Custom;
+          }
+        }
+      }
+
+      // Check strings in message, logs, transactionMessage
+      if (code === null) {
+        const textToSearch = [
+          err?.message,
+          typeof err === 'string' ? err : '',
+          Array.isArray(err?.logs) ? err.logs.join(' ') : '',
+          err?.transactionMessage,
+        ].filter(Boolean).join(' ');
+
+        const match = textToSearch.match(/custom program error:\s*0x([0-9a-fA-F]+)/i);
+        if (match) {
+          code = parseInt(match[1], 16);
+        } else {
+          // Also check for decimal custom error in logs/message if present
+          const customMatch = textToSearch.match(/Custom:\s*(\d+)/i) ?? textToSearch.match(/custom error\s*(\d+)/i);
+          if (customMatch) {
+            code = parseInt(customMatch[1], 10);
+          }
+        }
+      }
+
+      if (code !== null) {
+        const idlErr = (idl as any).errors?.find((e: any) => e.code === code);
+        if (idlErr) {
+          return new ChainError(idlErr.name, idlErr.msg);
+        }
+      }
+
+      const msg = err?.message || (typeof err === 'string' ? err : 'Unknown RPC error');
+      return new ChainError('RpcError', msg);
+    };
+
+    // 5. Set tx.recentBlockhash and lastValidBlockHeight from connection.getLatestBlockhash('confirmed'),
+    // sign with this.backendKeypair only, send with connection.sendRawTransaction(tx.serialize()) (preflight ON),
+    // then confirm with connection.confirmTransaction({signature, blockhash, lastValidBlockHeight}, 'confirmed').
+    let sendOrConfirmError: any = null;
+
+    try {
+      const latest = await this.connection.getLatestBlockhash('confirmed');
+      tx.recentBlockhash = latest.blockhash;
+      tx.lastValidBlockHeight = latest.lastValidBlockHeight;
+      tx.sign(this.backendKeypair);
+
+      const raw = tx.serialize();
+      const sig = await this.connection.sendRawTransaction(raw, { skipPreflight: false });
+      const confirmation = await this.connection.confirmTransaction(
+        {
+          signature: sig,
+          blockhash: latest.blockhash,
+          lastValidBlockHeight: latest.lastValidBlockHeight,
+        },
+        'confirmed',
+      );
+
+      if (confirmation?.value?.err) {
+        sendOrConfirmError = confirmation.value.err;
+      }
+    } catch (err: any) {
+      sendOrConfirmError = err;
+    }
+
+    if (!sendOrConfirmError) {
+      return;
+    }
+
+    // 6. Retry-safety: if sending or confirming THROWS for any reason (timeout, RPC error),
+    // call await this.isEnrolled(trainee) once. If true, return normally (the transaction landed).
+    // If false, continue to step 7 with the original error.
+    try {
+      const landed = await this.isEnrolled(trainee);
+      if (landed) {
+        return;
+      }
+    } catch {
+      // ignore check failure and continue to throw mapped error
+    }
+
+    // 7. Error mapping
+    throw mapToChainError(sendOrConfirmError);
   }
 
   async isEnrolled(wallet: string): Promise<boolean> {
