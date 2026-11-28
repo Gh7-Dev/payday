@@ -44,7 +44,7 @@ export function createApp(
     return c.json({ status: 'ok' }, 200);
   });
 
-  app.get('/config', (c) => {
+  app.get('/config', async (c) => {
     const isReal = (chain as any)?.backendKeypair !== undefined || (chain as any)?.constructor?.name === 'RealChain';
     const programId = process.env.PROGRAM_ID ?? (idl as { address?: string }).address ?? '';
     let backendKey: string | null = null;
@@ -56,12 +56,25 @@ export function createApp(
       backendKey = MOCK_BACKEND_KEY;
     }
 
+    const programmeAddress: string | null = isReal ? ((chain as any).programmeAddress?.toBase58?.() ?? null) : null;
+    let prog: any = null;
+    try {
+      prog = await chain.getProgramme();
+    } catch {
+      prog = null; // chain unreachable: leave the programme fields null
+    }
+
     return c.json(
       {
         chain: isReal ? 'real' : 'mock',
         cluster: 'devnet',
         programId,
         backendKey,
+        programmeAddress,
+        mint: prog ? String(prog.mint) : null,
+        startTs: prog ? String(prog.startTs) : null,
+        dayLen: prog ? String(prog.dayLen) : null,
+        days: prog ? Number(prog.days) : null,
       },
       200,
     );

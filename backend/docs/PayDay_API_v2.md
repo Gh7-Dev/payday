@@ -13,7 +13,7 @@ Status: every shape below comes from the code or a Devnet run. Items marked CONF
 
 ## 1. Public
 - GET /health -> {status:"ok"}
-- GET /config -> {chain:"mock"|"real", cluster:"devnet", programId, backendKey}. The organizer must pass `backendKey` as `backend_key` to create_programme. Any other key makes every enroll fail with InvalidBackend.
+- GET /config -> {chain, cluster, programId, backendKey, programmeAddress, mint, startTs, dayLen, days}. The last five are null until the programme exists; bigints are strings. The organizer must pass `backendKey` as `backend_key` to create_programme. Any other key makes every enroll fail with InvalidBackend.
 
 ## 2. Organizer login
 1. POST /auth/nonce {wallet} -> 200 {nonce, message, expiresAt}. expiresAt is unix seconds. Errors: invalid_json, wallet_required, invalid_wallet (all 400).
