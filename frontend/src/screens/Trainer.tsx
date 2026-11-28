@@ -1,20 +1,20 @@
 /// <reference types="vite/client" />
 import { useState } from 'react'
 import bs58 from 'bs58'
-import { Button, Field, Input, Card, Notice, Qr, Countdown } from '../ui'
+import { Connection, PublicKey } from '@solana/web3.js'
+import { Button, Field, Input, Card, Notice, Qr, Countdown, Copy } from '../ui'
 import { trainerSignup, trainerUnlock, postRelay, getConfig, ApiError } from '../lib/api'
 import { explain } from '../lib/errors'
 import { createWallet, encryptKey, decryptKey, loadCache, saveCache } from '../lib/keys'
 import { currentDay } from '../lib/format'
 import nacl from 'tweetnacl'
-import { Connection, PublicKey } from '@solana/web3.js'
 import { buildCheckIn, serialisePartial } from '../lib/chain'
 
 // Route: #/trainer/<eventId>/<code>
 // Step 1 – signup:  username + phone + password → keypair → encrypt → POST /trainer/signup
 // Step 2 – unlock:  username + password → POST /trainer/unlock → decrypt key into memory
 // Step 3 – ready:   paste trainee pubkey → build check_in tx → partial-sign → POST /relay
-// Step 4 – relay:   show relay QR + Countdown (60 s)
+// Step 4 – relay:   show relay QR + plain ID (paste fallback) + Countdown (60 s)
 
 type Step = 'signup' | 'unlock' | 'ready' | 'relay'
 
@@ -73,7 +73,11 @@ export function Trainer({ eventId, code }: { eventId: string; code: string }) {
         />
       )}
       {step === 'relay' && (
-        <RelayStep relayId={relayId} expiresAt={relayExpiry} onReset={() => setStep('ready')} />
+        <RelayStep
+          relayId={relayId}
+          expiresAt={relayExpiry}
+          onReset={() => setStep('ready')}
+        />
       )}
     </div>
   )
@@ -270,14 +274,13 @@ function ReadyStep({
 
       const tx = buildCheckIn(trainer, trainee, programme, mint, day)
 
-      const rpcUrl = (import.meta as { env: { VITE_RPC_URL?: string } }).env.VITE_RPC_URL
-        ?? 'https://api.devnet.solana.com'
+      const rpcUrl = import.meta.env.VITE_RPC_URL ?? 'https://api.devnet.solana.com'
       const conn = new Connection(rpcUrl, 'confirmed')
       const { blockhash } = await conn.getLatestBlockhash()
       tx.recentBlockhash = blockhash
       tx.feePayer = trainer
 
-      // Partial-sign as trainer (first signer)
+      // Partial-sign as trainer (first signer, fee payer)
       const kp = nacl.sign.keyPair.fromSecretKey(secretKey)
       tx.partialSign({ publicKey: trainer, secretKey: kp.secretKey })
 
@@ -301,12 +304,7 @@ function ReadyStep({
       </p>
       {err && <div style={{ marginBottom: 16 }}><Notice variant="danger">{err}</Notice></div>}
       <form onSubmit={startCheckIn} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* ── TASK 11 ────────────────────────────────────────────────────────────
-            Replace the text input below with a QR camera scanner (qr-scanner).
-            On scan success call setTraineePubkey(scannedValue).
-            Keep the paste field as a fallback.
-        ──────────────────────────────────────────────────────────────────────── */}
-        <Field label="Trainee wallet address" hint="Paste the address or scan their QR (camera — Task 11).">
+        <Field label="Trainee wallet address" hint="Paste the address shown under the trainee's QR.">
           <Input
             placeholder="Base58 public key"
             value={traineePubkey}
@@ -327,7 +325,7 @@ function ReadyStep({
   )
 }
 
-// ── Step 4: Relay QR + Countdown ─────────────────────────────────────────────
+// ── Step 4: Relay QR + plain ID + Countdown ───────────────────────────────────
 
 function RelayStep({
   relayId,
@@ -348,12 +346,28 @@ function RelayStep({
           Show trainee
         </h1>
         <p className="small" style={{ color: 'var(--ink-2)' }}>
-          Ask the trainee to scan this QR or paste the code. It expires in 60 seconds.
+          Ask the trainee to paste the code below. It expires in 60 seconds.
         </p>
       </div>
       {!expired ? (
         <>
-          <Qr data={relayId} caption={relayId} size={260} />
+          <Qr data={relayId} caption="Relay code" size={260} />
+          {/* Plain-text fallback so the trainee can paste without a camera */}
+          <Card style={{ padding: 16 }}>
+            <p className="small" style={{ color: 'var(--ink-2)', marginBottom: 8 }}>Relay ID</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <code style={{
+                flex: 1,
+                fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+                fontSize: '0.9em',
+                wordBreak: 'break-all',
+                color: 'var(--ink)',
+              }}>
+                {relayId}
+              </code>
+              <Copy text={relayId} />
+            </div>
+          </Card>
           <Countdown
             key={relayId}
             initialSeconds={secondsLeft}
@@ -362,7 +376,7 @@ function RelayStep({
         </>
       ) : (
         <>
-          <Notice variant="warn">The code has expired. Build a new one.</Notice>
+          <div><Notice variant="warn">The code has expired. Build a new one.</Notice></div>
           <Button variant="primary" large onClick={onReset}>
             Make a new code
           </Button>
