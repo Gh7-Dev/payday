@@ -189,11 +189,6 @@ h3 {
   text-decoration: none;
 }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .btn-primary {
   background: var(--accent);
   color: var(--paper);
@@ -207,6 +202,12 @@ h3 {
   opacity: 0.85;
 }
 
+.btn-primary:disabled {
+  background: var(--sunken);
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+
 .btn-secondary {
   background: transparent;
   color: var(--ink);
@@ -215,6 +216,12 @@ h3 {
 
 .btn-secondary:hover:not(:disabled) {
   background: var(--sunken);
+}
+
+.btn-secondary:disabled {
+  background: var(--sunken);
+  color: var(--ink-3);
+  cursor: not-allowed;
 }
 
 .btn-text {
@@ -226,6 +233,11 @@ h3 {
 
 .btn-text:hover:not(:disabled) {
   text-decoration: underline;
+}
+
+.btn-text:disabled {
+  color: var(--ink-3);
+  cursor: not-allowed;
 }
 
 .btn-large {
@@ -341,6 +353,219 @@ h3 {
 .notice-danger {
   border-left-color: var(--danger);
   background: var(--danger-soft);
+}
+
+/* --- Stat block ------------------------------------------- */
+.stat-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.stat-label {
+  display: block;
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.stat-unit {
+  display: block;
+}
+
+/* --- Modal ----------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(23, 21, 15, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-modal);
+  padding: var(--space-8);
+  max-width: 480px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* --- Copy button ----------------------------------------- */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  min-height: 44px;
+  transition: opacity 150ms ease-out;
+}
+
+.copy-btn:hover {
+  text-decoration: underline;
+}
+
+.copy-btn:active {
+  opacity: 0.7;
+}
+
+/* --- DayStrip -------------------------------------------- */
+.day-strip {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  width: fit-content;
+}
+
+.day-cell {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.day-cell:last-child {
+  border-right: none;
+}
+
+.day-cell--future {
+  background: var(--surface);
+}
+
+.day-cell--today {
+  background: var(--surface);
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.day-cell--paid {
+  background: var(--accent);
+}
+
+.day-cell--paid .day-tick {
+  display: block;
+  line-height: 0;
+}
+
+.day-cell--missed {
+  background: var(--sunken);
+  overflow: hidden;
+}
+
+.day-cell--missed .day-missed-line {
+  position: absolute;
+  inset: 0;
+}
+
+.day-number {
+  display: block;
+  margin-top: 2px;
+  line-height: 1;
+  font-size: 0.6875rem;
+}
+
+@media (max-width: 760px) {
+  .day-cell {
+    width: 36px;
+    height: 36px;
+  }
+
+  .day-tick {
+    width: 11px;
+    height: 11px;
+  }
+}
+
+/* --- QR card -------------------------------------------- */
+.qr-card {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: fit-content;
+}
+
+.qr-caption {
+  text-align: center;
+}
+
+/* --- Countdown ------------------------------------------- */
+.countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.countdown-number {
+  font-family: var(--font-ui);
+  font-size: 2.5rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ink);
+  transition: color 150ms ease-out;
+}
+
+.countdown-warn {
+  color: var(--warn);
+}
+
+.countdown-track {
+  width: 160px;
+  height: 2px;
+  background: var(--line);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.countdown-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 1s linear;
+  border-radius: 1px;
+}
+
+.countdown-expired {
+  text-align: center;
+}
+
+.countdown-expired .label {
+  font-size: 0.875rem;
 }
 
 /* --- Reduced motion --------------------------------------- */
