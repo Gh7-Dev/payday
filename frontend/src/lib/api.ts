@@ -1,6 +1,10 @@
+export interface ApiErrorDetail { line: number; column: number; code: string; message: string }
+
 export class ApiError extends Error {
-  constructor(public status: number, public code: string, message: string) {
+  errors: ApiErrorDetail[]
+  constructor(public status: number, public code: string, message: string, errors: ApiErrorDetail[] = []) {
     super(message);
+    this.errors = errors;
   }
 }
 
@@ -21,8 +25,11 @@ async function call<T>(method: string, path: string, body?: unknown, contentType
   let json: unknown;
   try { json = JSON.parse(text); } catch { json = {}; }
   if (!res.ok) {
-    const j = json as Record<string, string>;
-    throw new ApiError(res.status, j.error ?? 'unknown', j.message ?? j.error ?? res.statusText);
+    const j = json as Record<string, unknown>;
+    const errors = Array.isArray((j as { errors?: unknown }).errors)
+      ? (j as { errors: ApiErrorDetail[] }).errors
+      : [];
+    throw new ApiError(res.status, (j.error as string) ?? 'unknown', (j.message as string) ?? (j.error as string) ?? res.statusText, errors);
   }
   return json as T;
 }

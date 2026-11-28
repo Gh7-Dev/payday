@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button, Field, Input, Card, Notice, Table, TableHead, TableRow, TableCell } from '../ui'
-import { authNonce, authVerify, authMe, createEvent, addTrainer, uploadCsv, getEvent, listTrainers } from '../lib/api'
+import { authNonce, authVerify, authMe, createEvent, addTrainer, uploadCsv, getEvent, listTrainers, ApiError } from '../lib/api'
 import type { CsvOkResponse, CsvErrorResponse, TrainerRowApi } from '../lib/api'
 import Programme from './Programme'
 import Status from './Status'
@@ -309,10 +309,18 @@ function EventPage({ eventId, wallet }: { eventId: string; wallet: string }) {
         setCsvMsg({ ok: true, text: `${r.count} participants loaded. The vault will need ${formatAmount(r.grandTotal, decimals)} ${TOKEN} in total.` })
         refresh()
       } else {
-        setCsvMsg({ ok: false, text: `The CSV has ${r.errors.length} problem(s). Fix them and upload again. ${JSON.stringify(r.errors.slice(0, 3))}` })
+        const lines = (r.errors as { line: number; column: number; message: string }[])
+          .map(err => `line ${err.line}, column ${err.column}: ${err.message}`)
+          .join('\n')
+        setCsvMsg({ ok: false, text: `The CSV has ${r.errors.length} problem(s). Fix them and upload again.\n${lines}` })
       }
     } catch (e) {
-      setCsvMsg({ ok: false, text: errMsg(e) })
+      if (e instanceof ApiError && e.errors.length > 0) {
+        const lines = e.errors.map(err => `line ${err.line}, column ${err.column}: ${err.message}`).join('\n')
+        setCsvMsg({ ok: false, text: lines })
+      } else {
+        setCsvMsg({ ok: false, text: errMsg(e) })
+      }
     } finally {
       setBusy(false)
     }
