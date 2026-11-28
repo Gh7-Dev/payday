@@ -128,3 +128,7 @@ export const postRelay = (eventId: string, tx: string) =>
 // GET /relay/:id
 export const getRelay = (id: string) =>
   get<{ tx: string; expiresAt: number; secondsLeft: number }>(`/relay/${id}`);
+
+// GET /events/:id/trainers
+export interface TrainerRowApi { id: string; name: string; phone: string; wallet: string | null; state: string }
+export const listTrainers = (id: string) => get<{ trainers: TrainerRowApi[] }>(`/events/${id}/trainers`);

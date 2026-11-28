@@ -382,6 +382,20 @@ export function makeOrganizerRoutes(db: DatabaseSync, chain: ChainInterface) {
     }, 200);
   });
 
+  // GET /events/:id/trainers (list with wallets, for the organizer UI)
+  router.get('/events/:id/trainers', async (c) => {
+    const organizerWallet = c.get('wallet');
+    const eventId = c.req.param('id');
+    const event = getOrganizerEvent(eventId, organizerWallet);
+    if (!event) {
+      return c.json({ error: 'not_found' }, 404);
+    }
+    const rows = db.prepare(
+      'SELECT id, name, phone_e164 AS phone, wallet_address AS wallet, state FROM trainers WHERE event_id = ? ORDER BY created_at'
+    ).all(eventId);
+    return c.json({ trainers: rows }, 200);
+  });
+
   // 6) POST /events/:id/trainers/sync
   router.post('/events/:id/trainers/sync', async (c) => {
     const organizerWallet = c.get('wallet');

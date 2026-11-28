@@ -9,8 +9,7 @@ import {
   createLink,
   syncTrainers,
   ApiError,
-  type ChainStatus,
-} from '../lib/api'
+  type ChainStatus, listTrainers } from '../lib/api'
 import { explain } from '../lib/errors'
 import { formatAmount, shortAddress, currentDay } from '../lib/format'
 import { buildReclaim } from '../lib/chain'
@@ -125,14 +124,10 @@ export default function Status({ eventId, organizerWallet }: StatusProps) {
         getEvent(eventId),
         getChainStatus(eventId).catch(() => null),
       ])
-      const ev = evRaw as { event: EventDetail; trainers: { invited: Trainer[]; signed_up: Trainer[]; funded: Trainer[]; registered: Trainer[] } }
+      const ev = evRaw as unknown as { event: EventDetail }
       setEvent(ev.event)
-      setTrainers([
-        ...(ev.trainers.invited ?? []),
-        ...(ev.trainers.signed_up ?? []),
-        ...(ev.trainers.funded ?? []),
-        ...(ev.trainers.registered ?? []),
-      ])
+      const tl = await listTrainers(eventId).catch(() => ({ trainers: [] }))
+      setTrainers(tl.trainers as unknown as Trainer[])
       if (cs) setChainStatus(cs)
     } catch (e) {
       setLoadErr(errMsg(e))
@@ -256,7 +251,7 @@ export default function Status({ eventId, organizerWallet }: StatusProps) {
           <Stat
             label="Vault holds"
             value={cs.vaultBalance ? formatAmount(cs.vaultBalance, decimals) : '—'}
-            unit="units"
+            unit="test tokens"
           />
           <Stat
             label="Day"

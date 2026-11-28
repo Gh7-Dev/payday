@@ -224,7 +224,7 @@ export default function Programme({ event, trainers, organizerWallet, onDone }: 
         <Stat
           label="Grand total"
           value={event.grand_total ? formatAmount(event.grand_total, event.decimals) : '—'}
-          unit="units"
+          unit="test tokens"
         />
       </div>
 
