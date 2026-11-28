@@ -1,3 +1,5 @@
+Repo layout: payday/{program,backend,frontend}. Build the app in frontend/. Do not change program/ or backend/ without asking the owner.
+
 # PayDay frontend handoff (28 Nov 2026)
 
 ## 1. What PayDay is
@@ -10,7 +12,7 @@ Hackathon: Dev3pack Global Hackathon, ends 29 Nov 2026. Devnet and a test token 
 ## 2. What exists (backend, done)
 - Solana program (Anchor): create_programme, fund, add_trainer, enroll, check_in, reclaim. All six run on Devnet. A real run passed 22 of 22 checks, including a trainee wallet with 0 SOL signing a check-in while the trainer pays the fee.
 - Backend (Node, TypeScript, Hono, SQLite): wallet-signature login, organizer endpoints, trainer signup and unlock, trainee claim and unlock with PIN limits, check-in relay, config, chain-status. 138 tests passing.
-- API contract: docs/PayDay_API_v2.md. READ IT FIRST. It lists every endpoint, error code, the account order and PDA seeds for browser-side chain calls.
+- API contract: backend/docs/PayDay_API_v2.md. READ IT FIRST. It lists every endpoint, error code, the account order and PDA seeds for browser-side chain calls.
 
 ## 3. Not yet proven (the frontend will find any bugs)
 1. The relay with a real check-in transaction (only mocks so far). Build it exactly as section 7 of the API doc.
@@ -35,7 +37,7 @@ Audit page (cut first if short on time): totals locked, paid and returned per pr
 ## 5. Technical decisions
 - Stack: Vite, React, TypeScript. Use @solana/web3.js ^1.99 (same as the backend), wallet-adapter for the organizer (Phantom), tweetnacl for keypairs, WebCrypto (PBKDF2 plus AES-GCM) for the PIN and password encryption. Output must be base64 and at most 2048 characters for trainees.
 - Same-origin API: every call is fetch('/api/...', {credentials:'include'}). Netlify proxies /api/* to the backend with a _redirects line: `/api/*  https://YOUR-BACKEND.onrender.com/:splat  200`. Do not use SameSite=None.
-- Keep the IDL file in src (copy of the backend's payday.idl.json). Take the discriminators from it. Do not use the IDL's TypeScript client; build instructions by hand like scripts/devnet-checkin.ts does. That script is the reference for the check_in account order and signing.
+- Keep the IDL file in src (copy of backend/src/chain/payday.idl.json). Take the discriminators from it. Do not use the IDL's TypeScript client; build instructions by hand like backend/scripts/devnet-checkin.ts does. That script is the reference for the check_in account order and signing.
 - Enrollment PDA seeds are ["enrollment", trainee, programme], trainee FIRST.
 - Demo mode: days can be about 90 seconds. Show a live "day N of M" from chain-status.
 - Demo order: create and fund the programme, set PROGRAMME_ADDRESS on the backend, restart it, then trainers, links and claims.

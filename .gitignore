@@ -11,3 +11,12 @@ test-ledger
 *-keypair.json
 id.json
 wallet*.json
+
+# backend and frontend
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+dist
+.netlify
+!.env.example
