@@ -25,6 +25,8 @@ const MAP: Record<string, string> = {
   invalid_type: 'The link type must be "trainer" or "trainee".',
 
   // trainer / claim
+  bad_amounts: 'One or more daily amounts in the CSV are not valid numbers.',
+  not_claimed: 'This trainee has not claimed their wallet yet. Ask them to claim it first.',
   bad_request: 'The request was missing required fields.',
   unknown_link: 'That link code was not found.',
   bad_credentials_format: 'The username or password format is not valid.',
@@ -82,5 +84,5 @@ const MAP: Record<string, string> = {
 };
 
 export function explain(code: string): string {
-  return MAP[code] ?? `Something went wrong (${code}). Please try again or contact support.`;
+  return MAP[code] ?? 'Something went wrong. Please try again.';
 }

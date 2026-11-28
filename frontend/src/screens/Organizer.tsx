@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Button, Field, Input, Card, Notice, Table, TableHead, TableRow, TableCell } from '../ui'
 import { authNonce, authVerify, authMe, createEvent, addTrainer, uploadCsv, getEvent, listTrainers, ApiError } from '../lib/api'
 import type { CsvOkResponse, CsvErrorResponse, TrainerRowApi } from '../lib/api'
+import { explain } from '../lib/errors'
 import Programme from './Programme'
 import Status from './Status'
 import { formatAmount } from '../lib/format'
@@ -39,6 +40,10 @@ function getProvider(): any {
 }
 
 const errMsg = (e: unknown) => {
+  if (e instanceof ApiError) {
+    if (e.code === 'unauthorized') window.dispatchEvent(new Event('payday-auth-lost'))
+    return explain(e.code)
+  }
   const m = e instanceof Error ? e.message : String(e)
   if (m === 'unauthorized') window.dispatchEvent(new Event('payday-auth-lost'))
   return m
@@ -155,7 +160,7 @@ function OrganizerHome({ wallet }: { wallet: string }) {
   useEffect(() => {
     readRecent().forEach((e) => {
       getEvent(e.id).catch((x) => {
-        if (errMsg(x) === 'not_found') {
+        if (x instanceof ApiError && x.code === 'not_found') {
           removeRecent(e.id)
           setRecent(readRecent())
         }
@@ -290,7 +295,7 @@ function EventPage({ eventId, wallet }: { eventId: string; wallet: string }) {
       .catch((e) => {
         if (!live) return
         const m = errMsg(e)
-        if (m === 'not_found') removeRecent(eventId)
+        if (e instanceof ApiError && e.code === 'not_found') removeRecent(eventId)
         setErr(m)
       })
     return () => { live = false }
@@ -352,7 +357,7 @@ function EventPage({ eventId, wallet }: { eventId: string; wallet: string }) {
   if (err) return (
     <div style={wrap}>
       <Notice variant="danger">
-        {err === 'not_found'
+        {err === explain('not_found')
           ? 'This event is not on the server any more. It was probably created before the server was reset. It has been removed from your list. Create a new event to continue.'
           : err}
       </Notice>
