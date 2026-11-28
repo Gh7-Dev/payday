@@ -4,6 +4,7 @@ import {
   PublicKey,
   SystemProgram,
   Transaction,
+  TransactionInstruction,
   sendAndConfirmTransaction,
   Message,
 } from '@solana/web3.js';
@@ -223,6 +224,81 @@ export class RealChain implements ChainInterface {
     }
 
     return true;
+  }
+
+  buildEnrollTransaction(trainee: PublicKey, amounts: bigint[], mint: PublicKey): Transaction {
+    if (!this.backendKeypair) {
+      throw new ChainError('BackendKeyMissing', 'Backend keypair is required to build enroll transaction');
+    }
+
+    if (!amounts || amounts.length === 0) {
+      throw new ChainError('BadAmount', 'Amounts array cannot be empty');
+    }
+
+    const U64_MAX = 18446744073709551615n;
+    for (const amt of amounts) {
+      if (amt < 0n || amt > U64_MAX) {
+        throw new ChainError('BadAmount', `Invalid amount: ${amt}`);
+      }
+    }
+
+    const enrollDef = (idl as any).instructions?.find((i: any) => i.name === 'enroll');
+    if (!enrollDef || !Array.isArray(enrollDef.discriminator) || enrollDef.discriminator.length !== 8) {
+      throw new Error('enroll discriminator not found in IDL');
+    }
+
+    const disc = Buffer.from(enrollDef.discriminator);
+    const lenBuf = Buffer.alloc(4);
+    lenBuf.writeUInt32LE(amounts.length, 0);
+
+    const amtBufs = amounts.map((amt) => {
+      const b = Buffer.alloc(8);
+      b.writeBigUInt64LE(amt, 0);
+      return b;
+    });
+
+    const data = Buffer.concat([disc, lenBuf, ...amtBufs]);
+
+    const TOKEN_PROGRAM = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+    const ATA_PROGRAM = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+
+    const [enrollmentPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from('enrollment'), trainee.toBuffer(), this.programmeAddress.toBuffer()],
+      this.programId,
+    );
+
+    const [traineeTokenAccount] = PublicKey.findProgramAddressSync(
+      [trainee.toBuffer(), TOKEN_PROGRAM.toBuffer(), mint.toBuffer()],
+      ATA_PROGRAM,
+    );
+
+    const [vaultPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from('vault'), this.programmeAddress.toBuffer()],
+      this.programId,
+    );
+
+    const keys = [
+      { pubkey: this.backendKeypair.publicKey, isSigner: true, isWritable: true },
+      { pubkey: this.programmeAddress, isSigner: false, isWritable: true },
+      { pubkey: trainee, isSigner: false, isWritable: false },
+      { pubkey: enrollmentPda, isSigner: false, isWritable: true },
+      { pubkey: traineeTokenAccount, isSigner: false, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: vaultPda, isSigner: false, isWritable: false },
+      { pubkey: ATA_PROGRAM, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ];
+
+    const ix = new TransactionInstruction({
+      programId: this.programId,
+      keys,
+      data,
+    });
+
+    const tx = new Transaction().add(ix);
+    tx.feePayer = this.backendKeypair.publicKey;
+    return tx;
   }
 
   async enroll(trainee: string, amounts: bigint[]): Promise<void> {

@@ -269,3 +269,194 @@ test('RealChain DEVNET=1 smoke test', { skip: process.env.DEVNET !== '1' }, asyn
   assert.ok(typeof rent === 'bigint' && rent > 0n);
   console.log(`DEVNET getRentExempt(165): ${rent.toString()} lamports`);
 });
+
+test('RealChain buildEnrollTransaction account order, flags, feePayer and amounts', async () => {
+  const feePayer = Keypair.generate();
+  const backend = Keypair.generate();
+  const progId = Keypair.generate().publicKey;
+  const progAddr = Keypair.generate().publicKey;
+  const trainee = Keypair.generate().publicKey;
+  const mint = Keypair.generate().publicKey;
+
+  const chain = new RealChain({
+    feePayerSecretKey: bs58.encode(feePayer.secretKey),
+    backendKeySecretKey: bs58.encode(backend.secretKey),
+    programId: progId.toBase58(),
+    programmeAddress: progAddr.toBase58(),
+  });
+
+  const amounts = [100n, 250000n, 18446744073709551615n];
+  const tx = chain.buildEnrollTransaction(trainee, amounts, mint);
+
+  assert.equal(tx.feePayer?.toBase58(), backend.publicKey.toBase58());
+  assert.equal(tx.instructions.length, 1);
+
+  const ix = tx.instructions[0];
+  assert.equal(ix.programId.toBase58(), progId.toBase58());
+
+  // Derive expected PDAs
+  const TOKEN_PROGRAM = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+  const ATA_PROGRAM = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+  const [enrollmentPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('enrollment'), trainee.toBuffer(), progAddr.toBuffer()],
+    progId,
+  );
+  const [vaultPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('vault'), progAddr.toBuffer()],
+    progId,
+  );
+  const [expectedAta] = PublicKey.findProgramAddressSync(
+    [trainee.toBuffer(), TOKEN_PROGRAM.toBuffer(), mint.toBuffer()],
+    ATA_PROGRAM,
+  );
+
+  const expectedKeys = [
+    { pubkey: backend.publicKey.toBase58(), isSigner: true, isWritable: true },
+    { pubkey: progAddr.toBase58(), isSigner: false, isWritable: true },
+    { pubkey: trainee.toBase58(), isSigner: false, isWritable: false },
+    { pubkey: enrollmentPda.toBase58(), isSigner: false, isWritable: true },
+    { pubkey: expectedAta.toBase58(), isSigner: false, isWritable: true },
+    { pubkey: mint.toBase58(), isSigner: false, isWritable: false },
+    { pubkey: vaultPda.toBase58(), isSigner: false, isWritable: false },
+    { pubkey: ATA_PROGRAM.toBase58(), isSigner: false, isWritable: false },
+    { pubkey: TOKEN_PROGRAM.toBase58(), isSigner: false, isWritable: false },
+    { pubkey: '11111111111111111111111111111111', isSigner: false, isWritable: false },
+  ];
+
+  assert.equal(ix.keys.length, expectedKeys.length);
+  for (let i = 0; i < expectedKeys.length; i++) {
+    assert.equal(ix.keys[i].pubkey.toBase58(), expectedKeys[i].pubkey, `Key ${i} pubkey mismatch`);
+    assert.equal(ix.keys[i].isSigner, expectedKeys[i].isSigner, `Key ${i} isSigner mismatch`);
+    assert.equal(ix.keys[i].isWritable, expectedKeys[i].isWritable, `Key ${i} isWritable mismatch`);
+  }
+
+  // The only signer in keys is backend
+  const signers = ix.keys.filter((k) => k.isSigner);
+  assert.equal(signers.length, 1);
+  assert.equal(signers[0].pubkey.toBase58(), backend.publicKey.toBase58());
+
+  // Decode instruction data
+  const data = ix.data;
+  const enrollDef = (idl as any).instructions.find((i: any) => i.name === 'enroll');
+  const expectedDisc = Buffer.from(enrollDef.discriminator);
+  assert.deepEqual(data.subarray(0, 8), expectedDisc);
+
+  const decodedLen = data.readUInt32LE(8);
+  assert.equal(decodedLen, amounts.length);
+
+  const decodedAmounts: bigint[] = [];
+  for (let i = 0; i < decodedLen; i++) {
+    decodedAmounts.push(data.readBigUInt64LE(12 + i * 8));
+  }
+  assert.deepEqual(decodedAmounts, amounts);
+});
+
+test('RealChain buildEnrollTransaction ATA equals independently derived ATA', async () => {
+  const feePayer = Keypair.generate();
+  const backend = Keypair.generate();
+  const progId = Keypair.generate().publicKey;
+  const progAddr = Keypair.generate().publicKey;
+  const trainee = Keypair.generate().publicKey;
+  const mint = Keypair.generate().publicKey;
+
+  const chain = new RealChain({
+    feePayerSecretKey: bs58.encode(feePayer.secretKey),
+    backendKeySecretKey: bs58.encode(backend.secretKey),
+    programId: progId.toBase58(),
+    programmeAddress: progAddr.toBase58(),
+  });
+
+  const tx = chain.buildEnrollTransaction(trainee, [50n], mint);
+  const ix = tx.instructions[0];
+
+  const TOKEN_PROGRAM = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+  const ATA_PROGRAM = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+  const [independentAta] = PublicKey.findProgramAddressSync(
+    [trainee.toBuffer(), TOKEN_PROGRAM.toBuffer(), mint.toBuffer()],
+    ATA_PROGRAM,
+  );
+
+  assert.equal(ix.keys[4].pubkey.toBase58(), independentAta.toBase58());
+});
+
+test('RealChain buildEnrollTransaction throws BackendKeyMissing when backendKeypair missing', async () => {
+  const feePayer = Keypair.generate();
+  const progId = Keypair.generate().publicKey;
+  const progAddr = Keypair.generate().publicKey;
+  const trainee = Keypair.generate().publicKey;
+  const mint = Keypair.generate().publicKey;
+
+  const chain = new RealChain({
+    feePayerSecretKey: bs58.encode(feePayer.secretKey),
+    programId: progId.toBase58(),
+    programmeAddress: progAddr.toBase58(),
+  });
+
+  assert.throws(
+    () => chain.buildEnrollTransaction(trainee, [100n], mint),
+    (err: any) => err instanceof ChainError && err.code === 'BackendKeyMissing',
+  );
+});
+
+test('RealChain buildEnrollTransaction throws BadAmount when amounts is empty', async () => {
+  const feePayer = Keypair.generate();
+  const backend = Keypair.generate();
+  const progId = Keypair.generate().publicKey;
+  const progAddr = Keypair.generate().publicKey;
+  const trainee = Keypair.generate().publicKey;
+  const mint = Keypair.generate().publicKey;
+
+  const chain = new RealChain({
+    feePayerSecretKey: bs58.encode(feePayer.secretKey),
+    backendKeySecretKey: bs58.encode(backend.secretKey),
+    programId: progId.toBase58(),
+    programmeAddress: progAddr.toBase58(),
+  });
+
+  assert.throws(
+    () => chain.buildEnrollTransaction(trainee, [], mint),
+    (err: any) => err instanceof ChainError && err.code === 'BadAmount',
+  );
+});
+
+test('RealChain buildEnrollTransaction throws BadAmount when an amount is negative', async () => {
+  const feePayer = Keypair.generate();
+  const backend = Keypair.generate();
+  const progId = Keypair.generate().publicKey;
+  const progAddr = Keypair.generate().publicKey;
+  const trainee = Keypair.generate().publicKey;
+  const mint = Keypair.generate().publicKey;
+
+  const chain = new RealChain({
+    feePayerSecretKey: bs58.encode(feePayer.secretKey),
+    backendKeySecretKey: bs58.encode(backend.secretKey),
+    programId: progId.toBase58(),
+    programmeAddress: progAddr.toBase58(),
+  });
+
+  assert.throws(
+    () => chain.buildEnrollTransaction(trainee, [-1n], mint),
+    (err: any) => err instanceof ChainError && err.code === 'BadAmount',
+  );
+});
+
+test('RealChain buildEnrollTransaction throws BadAmount when an amount is above u64 max', async () => {
+  const feePayer = Keypair.generate();
+  const backend = Keypair.generate();
+  const progId = Keypair.generate().publicKey;
+  const progAddr = Keypair.generate().publicKey;
+  const trainee = Keypair.generate().publicKey;
+  const mint = Keypair.generate().publicKey;
+
+  const chain = new RealChain({
+    feePayerSecretKey: bs58.encode(feePayer.secretKey),
+    backendKeySecretKey: bs58.encode(backend.secretKey),
+    programId: progId.toBase58(),
+    programmeAddress: progAddr.toBase58(),
+  });
+
+  assert.throws(
+    () => chain.buildEnrollTransaction(trainee, [18446744073709551616n], mint),
+    (err: any) => err instanceof ChainError && err.code === 'BadAmount',
+  );
+});
