@@ -8,6 +8,7 @@ import { makeOrganizerRoutes } from './routes/organizer.js';
 import { makeClaimRoutes } from './routes/claim.js';
 import { makeTrainerRoutes } from './routes/trainer.js';
 import { makeRelayRoutes } from './routes/relay.js';
+import { makeChainStatusRoutes } from './routes/chainStatus.js';
 import type { RelayOptions } from './routes/relay.js';
 import { Limiter } from './limiter.js';
 import { getDb, migrate } from './db.js';
@@ -71,6 +72,7 @@ export function createApp(
   app.route('/claim', makeClaimRoutes(db, chain, guard));
   app.route('/trainer', makeTrainerRoutes(db, chain, guard));
   app.route('/relay', makeRelayRoutes(db, chain, relayOpts));
+  app.route('/', makeChainStatusRoutes(db, chain));
   app.route('/', makeOrganizerRoutes(db, chain));
 
   return app;
