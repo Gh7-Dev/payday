@@ -422,7 +422,7 @@ fn enroll_after_end_rejected() {
     enroll(&mut w, &a, schedule(1_000_000)).expect("one second before the end must succeed");
     set_time(&mut w.svm, END_TS);
     let res = enroll(&mut w, &b, schedule(1_000_000));
-    assert_rejected(&res, &["ProgrammeEnded"], "after end");
+    assert_rejected(&res, &["ProgrammeClosed"], "after end");
     assert_no_enrollment(&w, &b);
     assert_eq!(read_programme(&w.svm, &w.programme).enrolled, 1);
     // WHAT THIS PROVES: enrolling is allowed until the programme's end time and refused from

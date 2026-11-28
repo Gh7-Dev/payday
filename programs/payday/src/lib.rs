@@ -30,6 +30,10 @@ pub mod payday {
         enroll::handler(ctx, amounts)
     }
 
+    pub fn check_in(ctx: Context<CheckIn>, day: u8) -> Result<()> {
+        check_in::handler(ctx, day)
+    }
+
     /*pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         crate::instructions::initialize::handle_initialize(ctx)
     }

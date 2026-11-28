@@ -94,7 +94,7 @@ pub fn handler(ctx: Context<Enroll>, amounts: Vec<u64>,) -> Result<()> {
 
     require!(
         now < end_ts,
-        PayDayError::ProgrammeEnded
+        PayDayError::ProgrammeClosed
     );
 
     // 2. Check participant capacity.
