@@ -9,7 +9,7 @@ import {
   createLink,
   syncTrainers,
   ApiError,
-  type ChainStatus, listTrainers } from '../lib/api'
+  type ChainStatus, listTrainers, getConfig } from '../lib/api'
 import { explain } from '../lib/errors'
 import { formatAmount, shortAddress, currentDay } from '../lib/format'
 import { buildReclaim } from '../lib/chain'
@@ -102,6 +102,7 @@ export default function Status({ eventId, organizerWallet }: StatusProps) {
   const [trainers, setTrainers] = useState<Trainer[]>([])
   const [chainStatus, setChainStatus] = useState<ChainStatus | null>(null)
   const [loadErr, setLoadErr] = useState('')
+  const [programmeReady, setProgrammeReady] = useState(false)
 
   // Link modal state
   const [linkModal, setLinkModal] = useState<{ type: 'trainer' | 'trainee'; code: string; url: string } | null>(null)
@@ -129,6 +130,7 @@ export default function Status({ eventId, organizerWallet }: StatusProps) {
       const tl = await listTrainers(eventId).catch(() => ({ trainers: [] }))
       setTrainers(tl.trainers as unknown as Trainer[])
       if (cs) setChainStatus(cs)
+      getConfig().then(c => setProgrammeReady(!!c.programmeAddress && !!c.mint)).catch(() => setProgrammeReady(false))
     } catch (e) {
       setLoadErr(errMsg(e))
     }
@@ -311,11 +313,12 @@ export default function Status({ eventId, organizerWallet }: StatusProps) {
       <div>
         <h3 style={{ fontSize: '1.0625rem', fontWeight: 600, marginBottom: 12 }}>Links</h3>
         {linkErr && <div style={{ marginBottom: 12 }}><Notice variant="danger">{linkErr}</Notice></div>}
+        {!programmeReady && <div style={{ marginBottom: 12 }}><Notice variant="warn">The trainee link works once the backend has the programme address. Set PROGRAMME_ADDRESS on the backend and restart it.</Notice></div>}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <Button
             variant="secondary"
             onClick={() => handleCreateLink('trainee')}
-            disabled={linkBusy === 'trainee'}
+            disabled={linkBusy === 'trainee' || !programmeReady}
           >
             {linkBusy === 'trainee' ? 'Creating…' : 'New trainee link'}
           </Button>
