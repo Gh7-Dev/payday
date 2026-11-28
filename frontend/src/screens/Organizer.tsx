@@ -38,7 +38,11 @@ function getProvider(): any {
   return w.phantom?.solana ?? w.solana ?? null
 }
 
-const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e))
+const errMsg = (e: unknown) => {
+  const m = e instanceof Error ? e.message : String(e)
+  if (m === 'unauthorized') window.dispatchEvent(new Event('payday-auth-lost'))
+  return m
+}
 const wrap: React.CSSProperties = { maxWidth: 960, margin: '0 auto', padding: '48px 24px' }
 const row: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 440 }
 
@@ -60,6 +64,15 @@ function saveRecent(id: string, name: string) {
   }
 }
 
+function removeRecent(id: string) {
+  try {
+    const list = readRecent().filter((e) => e.id !== id)
+    localStorage.setItem('payday.events', JSON.stringify(list))
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 function SessionGate({ children }: { children: (wallet: string) => ReactNode }) {
   const [wallet, setWallet] = useState<string | null | undefined>(undefined)
   const [err, setErr] = useState('')
@@ -69,6 +82,15 @@ function SessionGate({ children }: { children: (wallet: string) => ReactNode }) 
     authMe()
       .then((r) => setWallet(r.wallet))
       .catch(() => setWallet(null))
+  }, [])
+
+  useEffect(() => {
+    const lost = () => {
+      setWallet(null)
+      setErr('Your session ended. Sign in again to continue.')
+    }
+    window.addEventListener('payday-auth-lost', lost)
+    return () => window.removeEventListener('payday-auth-lost', lost)
   }, [])
 
   const login = async () => {
@@ -128,7 +150,18 @@ function OrganizerHome({ wallet }: { wallet: string }) {
   const [maxP, setMaxP] = useState('20')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
-  const recent = readRecent()
+  const [recent, setRecent] = useState(readRecent())
+
+  useEffect(() => {
+    readRecent().forEach((e) => {
+      getEvent(e.id).catch((x) => {
+        if (errMsg(x) === 'not_found') {
+          removeRecent(e.id)
+          setRecent(readRecent())
+        }
+      })
+    })
+  }, [])
 
   const submit = async () => {
     setErr('')
@@ -254,7 +287,12 @@ function EventPage({ eventId, wallet }: { eventId: string; wallet: string }) {
         setPCounts(raw.participants ?? {})
         setTrainers(t.trainers ?? [])
       })
-      .catch((e) => { if (live) setErr(errMsg(e)) })
+      .catch((e) => {
+        if (!live) return
+        const m = errMsg(e)
+        if (m === 'not_found') removeRecent(eventId)
+        setErr(m)
+      })
     return () => { live = false }
   }, [eventId, tick])
 
@@ -303,7 +341,16 @@ function EventPage({ eventId, wallet }: { eventId: string; wallet: string }) {
     }
   }
 
-  if (err) return <div style={wrap}><Notice variant="danger">{err}</Notice><p style={{ marginTop: 16 }}><a href="#/organizer">Back to events</a></p></div>
+  if (err) return (
+    <div style={wrap}>
+      <Notice variant="danger">
+        {err === 'not_found'
+          ? 'This event is not on the server any more. It was probably created before the server was reset. It has been removed from your list. Create a new event to continue.'
+          : err}
+      </Notice>
+      <p style={{ marginTop: 16 }}><a href="#/organizer">Back to events</a></p>
+    </div>
+  )
   if (!ev) return <div style={wrap}><p className="small">Loading event.</p></div>
 
   const pTotal = Object.values(pCounts).reduce((a, b) => a + Number(b || 0), 0)
@@ -410,10 +457,10 @@ function EventPage({ eventId, wallet }: { eventId: string; wallet: string }) {
           <>
             {signedUp === 0 && (
               <div style={{ marginBottom: 16 }}>
-                <Notice variant="warn">No trainer has signed up yet. Only trainers who have signed up can be registered on chain, so finish step 3 first.</Notice>
+                <Notice variant="warn">No trainer has signed up yet. Only trainers who have signed up can be registered on chain, so the create button appears here once one has signed up (step 3).</Notice>
               </div>
             )}
-            <Programme event={event} trainers={trainers} organizerWallet={wallet} onDone={refresh} />
+            {signedUp > 0 && <Programme event={event} trainers={trainers} organizerWallet={wallet} onDone={refresh} />}
           </>
         )}
       </Step>
