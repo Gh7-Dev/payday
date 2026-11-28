@@ -213,6 +213,26 @@ export function makeTrainerRoutes(db: DatabaseSync, chain: ChainInterface, guard
     return c.json({ state: 'funded' }, 200);
   });
 
+  // POST /trainer/resolve {eventId, phone} -> {wallet}: find a trainee's stored wallet by phone
+  router.post('/resolve', async (c) => {
+    const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body || typeof body.eventId !== 'string' || typeof body.phone !== 'string') {
+      return c.json({ error: 'bad_request' }, 400);
+    }
+    const ip = clientIp(c);
+    let norm: string | null = null;
+    try { norm = normalizeKenyaPhone(body.phone) ?? null; } catch { norm = null; }
+    const key = norm ?? 'invalid';
+    if (guard.check(ip, key) === true) return c.json({ error: 'too_many_attempts' }, 429);
+    const row = norm
+      ? (db.prepare(`SELECT wallet_address FROM participants WHERE event_id = ? AND phone_e164 = ?`)
+          .get(body.eventId, norm) as { wallet_address: string | null } | undefined)
+      : undefined;
+    if (!row) { guard.fail(ip, key); return c.json({ error: 'not_on_list' }, 404); }
+    if (!row.wallet_address) return c.json({ error: 'not_claimed' }, 409);
+    return c.json({ wallet: row.wallet_address }, 200);
+  });
+
   router.post('/unlock', async (c) => {
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body || typeof body !== 'object') return c.json({ error: 'bad_request' }, 400);

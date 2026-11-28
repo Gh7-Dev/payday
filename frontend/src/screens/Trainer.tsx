@@ -3,7 +3,7 @@ import { useState } from 'react'
 import bs58 from 'bs58'
 import { Connection, PublicKey } from '@solana/web3.js'
 import { Button, Field, Input, Card, Notice, Qr, Countdown, Copy } from '../ui'
-import { trainerSignup, trainerUnlock, postRelay, getConfig, ApiError } from '../lib/api'
+import { trainerSignup, trainerUnlock, postRelay, getConfig, ApiError, resolveTrainee } from '../lib/api'
 import { explain } from '../lib/errors'
 import { createWallet, encryptKey, decryptKey, loadCache, saveCache } from '../lib/keys'
 import { currentDay } from '../lib/format'
@@ -256,7 +256,7 @@ function ReadyStep({
   secretKey: Uint8Array
   onRelay: (id: string, expiresAt: number) => void
 }) {
-  const [traineePubkey, setTraineePubkey] = useState('')
+  const [traineePhone, setTraineePhone] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -286,7 +286,18 @@ function ReadyStep({
       }
 
       const trainer = new PublicKey(trainerWallet)
-      const trainee = new PublicKey(traineePubkey)
+      let wallet: string
+      try {
+        wallet = (await resolveTrainee(eventId, traineePhone)).wallet
+      } catch (e: unknown) {
+        const code = (e as { code?: string })?.code
+        if (code === 'not_on_list') setErr('That number is not on this programme\'s list.')
+        else if (code === 'not_claimed') setErr('This trainee has not claimed their wallet yet. Ask them to claim it first.')
+        else setErr(errMsg(e))
+        setBusy(false)
+        return
+      }
+      const trainee = new PublicKey(wallet)
       const programme = new PublicKey(cfg.programmeAddress)
       const mint = new PublicKey(cfg.mint)
 
@@ -318,21 +329,21 @@ function ReadyStep({
         Start check-in
       </h1>
       <p className="small" style={{ color: 'var(--ink-2)', marginBottom: 24 }}>
-        Ask the trainee to show their wallet QR, then paste their address below.
+        Ask the trainee to type their phone number below.
       </p>
       {err && <div style={{ marginBottom: 16 }}><Notice variant="danger">{err}</Notice></div>}
       <form onSubmit={startCheckIn} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Field label="Trainee wallet address" hint="Paste the address shown under the trainee's QR.">
+        <Field label="Trainee phone number" hint="The number the organizer registered for the trainee.">
           <Input
-            placeholder="Base58 public key"
-            value={traineePubkey}
-            onChange={e => setTraineePubkey(e.target.value.trim())}
+            type="tel"
+            placeholder="+254 700 000 000"
+            value={traineePhone}
+            onChange={e => setTraineePhone(e.target.value)}
             required
-            autoComplete="off"
-            style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace', fontSize: '0.9em' }}
+            autoComplete="tel"
           />
         </Field>
-        <Button variant="primary" large type="submit" disabled={busy || !traineePubkey}>
+        <Button variant="primary" large type="submit" disabled={busy || !traineePhone}>
           {busy ? 'Building transaction…' : 'Start check-in'}
         </Button>
       </form>

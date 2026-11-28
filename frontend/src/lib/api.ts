@@ -125,6 +125,10 @@ export const claimUnlock = (linkCode: string, phone: string, pin: string) =>
 export const postRelay = (eventId: string, tx: string) =>
   post<{ id: string; expiresAt: number }>('/relay', { eventId, tx });
 
+// POST /trainer/resolve
+export const resolveTrainee = (eventId: string, phone: string) =>
+  post<{ wallet: string }>('/trainer/resolve', { eventId, phone });
+
 // GET /relay/:id
 export const getRelay = (id: string) =>
   get<{ tx: string; expiresAt: number; secondsLeft: number }>(`/relay/${id}`);
