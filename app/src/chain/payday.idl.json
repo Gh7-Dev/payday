@@ -8,6 +8,341 @@
   },
   "instructions": [
     {
+      "name": "add_trainer",
+      "discriminator": [
+        41,
+        184,
+        124,
+        63,
+        115,
+        167,
+        164,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "organizer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "programme"
+          ]
+        },
+        {
+          "name": "programme",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "organizer"
+              },
+              {
+                "kind": "arg",
+                "path": "programme_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "trainer_wallet",
+          "docs": [
+            "The trainer does not need to sign during registration."
+          ]
+        },
+        {
+          "name": "trainer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  97,
+                  105,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "programme"
+              },
+              {
+                "kind": "account",
+                "path": "trainer_wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "programme_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "check_in",
+      "discriminator": [
+        209,
+        253,
+        4,
+        217,
+        250,
+        241,
+        207,
+        50
+      ],
+      "accounts": [
+        {
+          "name": "trainer",
+          "signer": true
+        },
+        {
+          "name": "trainee",
+          "signer": true
+        },
+        {
+          "name": "programme",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "programme.organizer",
+                "account": "Programme"
+              },
+              {
+                "kind": "account",
+                "path": "programme.programme_id",
+                "account": "Programme"
+              }
+            ]
+          }
+        },
+        {
+          "name": "trainer_account",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  97,
+                  105,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "programme"
+              },
+              {
+                "kind": "account",
+                "path": "trainer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "enrollment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  110,
+                  114,
+                  111,
+                  108,
+                  108,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "trainee"
+              },
+              {
+                "kind": "account",
+                "path": "programme"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "programme"
+              }
+            ]
+          }
+        },
+        {
+          "name": "trainee_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "trainee"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "day",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "create_programme",
       "discriminator": [
         11,
@@ -115,9 +450,427 @@
           "type": "u16"
         }
       ]
+    },
+    {
+      "name": "enroll",
+      "discriminator": [
+        58,
+        12,
+        36,
+        3,
+        142,
+        28,
+        1,
+        43
+      ],
+      "accounts": [
+        {
+          "name": "backend",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "programme",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "programme.organizer",
+                "account": "Programme"
+              },
+              {
+                "kind": "account",
+                "path": "programme.programme_id",
+                "account": "Programme"
+              }
+            ]
+          }
+        },
+        {
+          "name": "trainee",
+          "docs": [
+            "The trainee does not need to sign enrollment."
+          ]
+        },
+        {
+          "name": "enrollment",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  110,
+                  114,
+                  111,
+                  108,
+                  108,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "trainee"
+              },
+              {
+                "kind": "account",
+                "path": "programme"
+              }
+            ]
+          }
+        },
+        {
+          "name": "trainee_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "trainee"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "programme"
+              }
+            ]
+          }
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amounts",
+          "type": {
+            "vec": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "fund",
+      "discriminator": [
+        218,
+        188,
+        111,
+        221,
+        152,
+        113,
+        174,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "organizer",
+          "signer": true,
+          "relations": [
+            "programme"
+          ]
+        },
+        {
+          "name": "programme",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "organizer"
+              },
+              {
+                "kind": "arg",
+                "path": "programme_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "organizer_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "programme"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "programme_id",
+          "type": "u64"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "reclaim",
+      "discriminator": [
+        44,
+        177,
+        236,
+        249,
+        145,
+        109,
+        163,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "organizer",
+          "signer": true,
+          "relations": [
+            "programme"
+          ]
+        },
+        {
+          "name": "programme",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "organizer"
+              },
+              {
+                "kind": "account",
+                "path": "programme.programme_id",
+                "account": "Programme"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "programme"
+              }
+            ]
+          }
+        },
+        {
+          "name": "organizer_token_account",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
+    {
+      "name": "Enrollment",
+      "discriminator": [
+        249,
+        210,
+        64,
+        145,
+        197,
+        241,
+        57,
+        51
+      ]
+    },
     {
       "name": "Programme",
       "discriminator": [
@@ -130,31 +883,143 @@
         62,
         127
       ]
+    },
+    {
+      "name": "Trainer",
+      "discriminator": [
+        7,
+        190,
+        144,
+        244,
+        15,
+        161,
+        210,
+        92
+      ]
     }
   ],
   "errors": [
     {
       "code": 6000,
       "name": "InvalidDays",
-      "msg": "Enter a valid day"
+      "msg": "The number of days must be between 1 and 31."
     },
     {
       "code": 6001,
       "name": "InvalidDayLength",
-      "msg": "Enter a day length between 1 to 31"
+      "msg": "The day length must be at least 60 seconds."
     },
     {
       "code": 6002,
       "name": "StartInPast",
-      "msg": "Event cannot start in the past"
+      "msg": "The programme start time cannot be in the past."
     },
     {
       "code": 6003,
       "name": "InvalidCapacity",
-      "msg": "Enter at least 1 participant"
+      "msg": "The maximum number of participants must be at least 1."
+    },
+    {
+      "code": 6004,
+      "name": "Unauthorized",
+      "msg": "Only the organizer of this programme can perform this action."
+    },
+    {
+      "code": 6005,
+      "name": "InvalidBackend",
+      "msg": "Only the backend key stored in this programme can enroll participants."
+    },
+    {
+      "code": 6006,
+      "name": "MathOverflow",
+      "msg": "An arithmetic overflow or underflow was prevented."
+    },
+    {
+      "code": 6007,
+      "name": "ProgrammeClosed",
+      "msg": "The programme is closed: its end time has passed or its remaining funds were already reclaimed."
+    },
+    {
+      "code": 6008,
+      "name": "ProgrammeFull",
+      "msg": "The programme has reached its maximum number of participants."
+    },
+    {
+      "code": 6009,
+      "name": "ZeroAmount",
+      "msg": "The amount must be greater than zero."
+    },
+    {
+      "code": 6010,
+      "name": "WrongScheduleLength",
+      "msg": "The number of daily amounts must equal the number of programme days."
+    },
+    {
+      "code": 6011,
+      "name": "InsufficientFunding",
+      "msg": "The vault does not hold enough tokens to cover all promised payments."
+    },
+    {
+      "code": 6012,
+      "name": "TrainerIsTrainee",
+      "msg": "A trainer cannot check themselves in: trainer and participant must be different wallets."
+    },
+    {
+      "code": 6013,
+      "name": "NotStarted",
+      "msg": "The programme has not started yet."
+    },
+    {
+      "code": 6014,
+      "name": "WrongDay",
+      "msg": "The day given does not match the current programme day, or is outside the programme."
+    },
+    {
+      "code": 6015,
+      "name": "AlreadyCheckedIn",
+      "msg": "This participant has already been checked in and paid for this day."
+    },
+    {
+      "code": 6016,
+      "name": "EventNotOver",
+      "msg": "Remaining funds can only be reclaimed after the programme's end time."
     }
   ],
   "types": [
+    {
+      "name": "Enrollment",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "programme",
+            "type": "pubkey"
+          },
+          {
+            "name": "trainee",
+            "type": "pubkey"
+          },
+          {
+            "name": "attendance_mask",
+            "type": "u32"
+          },
+          {
+            "name": "paid_total",
+            "type": "u64"
+          },
+          {
+            "name": "amounts",
+            "type": {
+              "vec": "u64"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
     {
       "name": "Programme",
       "type": {
@@ -226,13 +1091,33 @@
           }
         ]
       }
+    },
+    {
+      "name": "Trainer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "programme",
+            "type": "pubkey"
+          },
+          {
+            "name": "trainer",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     }
   ],
   "constants": [
     {
-      "name": "MAX_COUNT",
-      "type": "u64",
-      "value": "10"
+      "name": "ENROLLMENT_SEED",
+      "type": "bytes",
+      "value": "[101, 110, 114, 111, 108, 108, 109, 101, 110, 116]"
     },
     {
       "name": "PROGRAMME_SEED",

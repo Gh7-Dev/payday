@@ -165,7 +165,64 @@ export class RealChain implements ChainInterface {
   }
 
   async isTrainerRegistered(wallet: string): Promise<boolean> {
-    throw new ChainError('NotImplementedYet', 'isTrainerRegistered not implemented yet');
+    let trainerPubkey: PublicKey;
+    try {
+      trainerPubkey = new PublicKey(wallet);
+      if (!PublicKey.isOnCurve(trainerPubkey.toBuffer())) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+
+    const [trainerPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from('trainer'), this.programmeAddress.toBuffer(), trainerPubkey.toBuffer()],
+      this.programId,
+    );
+
+    const acc = await this.connection.getAccountInfo(trainerPda);
+    if (!acc) {
+      return false;
+    }
+
+    if (!acc.owner.equals(this.programId)) {
+      return false;
+    }
+
+    const trainerAccountDef = (idl as any).accounts?.find((a: any) => a.name === 'Trainer');
+    const expectedDisc = trainerAccountDef?.discriminator;
+    if (!expectedDisc || !Array.isArray(expectedDisc) || expectedDisc.length !== 8) {
+      throw new Error('Trainer discriminator not found in IDL');
+    }
+
+    if (acc.data.length < 8) {
+      return false;
+    }
+
+    const discBuffer = Buffer.from(expectedDisc);
+    if (!acc.data.subarray(0, 8).equals(discBuffer)) {
+      return false;
+    }
+
+    let decoded: any;
+    try {
+      decoded = this.coder.decode('Trainer', acc.data as Buffer);
+    } catch {
+      return false;
+    }
+
+    const trainerVal = decoded.trainer?.toBase58 ? decoded.trainer.toBase58() : decoded.trainer?.toString();
+    const programmeVal = decoded.programme?.toBase58 ? decoded.programme.toBase58() : decoded.programme?.toString();
+
+    if (trainerVal !== wallet) {
+      return false;
+    }
+
+    if (programmeVal !== this.programmeAddress.toBase58()) {
+      return false;
+    }
+
+    return true;
   }
 
   async enroll(trainee: string, amounts: bigint[]): Promise<void> {
@@ -173,6 +230,57 @@ export class RealChain implements ChainInterface {
   }
 
   async isEnrolled(wallet: string): Promise<boolean> {
-    throw new ChainError('NotImplementedYet', 'isEnrolled not implemented yet');
+    let traineePubkey: PublicKey;
+    try {
+      traineePubkey = new PublicKey(wallet);
+      if (!PublicKey.isOnCurve(traineePubkey.toBuffer())) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+
+    const [enrollmentPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from('enrollment'), traineePubkey.toBuffer(), this.programmeAddress.toBuffer()],
+      this.programId,
+    );
+
+    const acc = await this.connection.getAccountInfo(enrollmentPda);
+    if (!acc) {
+      return false;
+    }
+
+    if (!acc.owner.equals(this.programId)) {
+      return false;
+    }
+
+    const enrollmentAccountDef = (idl as any).accounts?.find((a: any) => a.name === 'Enrollment');
+    const expectedDisc = enrollmentAccountDef?.discriminator;
+    if (!expectedDisc || !Array.isArray(expectedDisc) || expectedDisc.length !== 8) {
+      throw new Error('Enrollment discriminator not found in IDL');
+    }
+
+    if (acc.data.length < 8) {
+      return false;
+    }
+
+    const discBuffer = Buffer.from(expectedDisc);
+    if (!acc.data.subarray(0, 8).equals(discBuffer)) {
+      return false;
+    }
+
+    let decoded: any;
+    try {
+      decoded = this.coder.decode('Enrollment', acc.data as Buffer);
+    } catch {
+      return false;
+    }
+
+    const traineeVal = decoded.trainee?.toBase58 ? decoded.trainee.toBase58() : decoded.trainee?.toString();
+    if (traineeVal !== wallet) {
+      return false;
+    }
+
+    return true;
   }
 }

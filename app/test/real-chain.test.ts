@@ -131,19 +131,129 @@ test('RealChain offline tests with fake Connection', async () => {
   assert.equal(decodedProgramme.totalFunded, 5000000n);
   assert.equal(decodedProgramme.reclaimed, false);
 
-  // Test NotImplementedYet methods
-  await assert.rejects(
-    async () => chain.isTrainerRegistered('dummy'),
-    (err: any) => err instanceof ChainError && err.code === 'NotImplementedYet',
-  );
+  // Test enroll still throws NotImplementedYet
   await assert.rejects(
     async () => chain.enroll('dummy', [100n]),
     (err: any) => err instanceof ChainError && err.code === 'NotImplementedYet',
   );
-  await assert.rejects(
-    async () => chain.isEnrolled('dummy'),
-    (err: any) => err instanceof ChainError && err.code === 'NotImplementedYet',
-  );
+
+  // --- Tests for isEnrolled ---
+  const traineeKey = Keypair.generate().publicKey;
+  const otherTraineeKey = Keypair.generate().publicKey;
+  const mockEnrollment = {
+    programme: progAddr,
+    trainee: traineeKey,
+    attendance_mask: 0,
+    paid_total: new BN(0),
+    amounts: [new BN(100), new BN(200)],
+    bump: 255,
+  };
+  const encodedEnrollment = await coder.encode('Enrollment', mockEnrollment);
+
+  // 1. Missing account -> false
+  fakeConnection.getAccountInfo = async () => null;
+  assert.equal(await chain.isEnrolled(traineeKey.toBase58()), false);
+
+  // 2. Wrong owner -> false
+  fakeConnection.getAccountInfo = async () => ({
+    data: encodedEnrollment,
+    executable: false,
+    lamports: 1000000,
+    owner: Keypair.generate().publicKey,
+  });
+  assert.equal(await chain.isEnrolled(traineeKey.toBase58()), false);
+
+  // 3. Wrong discriminator -> false
+  const badDiscEnrollment = Buffer.from(encodedEnrollment);
+  badDiscEnrollment[0] ^= 0xff;
+  fakeConnection.getAccountInfo = async () => ({
+    data: badDiscEnrollment,
+    executable: false,
+    lamports: 1000000,
+    owner: progId,
+  });
+  assert.equal(await chain.isEnrolled(traineeKey.toBase58()), false);
+
+  // 4. Correct account -> true
+  fakeConnection.getAccountInfo = async () => ({
+    data: encodedEnrollment,
+    executable: false,
+    lamports: 1000000,
+    owner: progId,
+  });
+  assert.equal(await chain.isEnrolled(traineeKey.toBase58()), true);
+
+  // 5. Wrong wallet inside account -> false
+  assert.equal(await chain.isEnrolled(otherTraineeKey.toBase58()), false);
+
+  // 6. Invalid wallet string -> false
+  assert.equal(await chain.isEnrolled('invalid-wallet-string'), false);
+
+  // --- Tests for isTrainerRegistered ---
+  const trainerKey = Keypair.generate().publicKey;
+  const otherTrainerKey = Keypair.generate().publicKey;
+  const mockTrainer = {
+    programme: progAddr,
+    trainer: trainerKey,
+    bump: 254,
+  };
+  const encodedTrainer = await coder.encode('Trainer', mockTrainer);
+
+  // 1. Missing account -> false
+  fakeConnection.getAccountInfo = async () => null;
+  assert.equal(await chain.isTrainerRegistered(trainerKey.toBase58()), false);
+
+  // 2. Wrong owner -> false
+  fakeConnection.getAccountInfo = async () => ({
+    data: encodedTrainer,
+    executable: false,
+    lamports: 1000000,
+    owner: Keypair.generate().publicKey,
+  });
+  assert.equal(await chain.isTrainerRegistered(trainerKey.toBase58()), false);
+
+  // 3. Wrong discriminator -> false
+  const badDiscTrainer = Buffer.from(encodedTrainer);
+  badDiscTrainer[0] ^= 0xff;
+  fakeConnection.getAccountInfo = async () => ({
+    data: badDiscTrainer,
+    executable: false,
+    lamports: 1000000,
+    owner: progId,
+  });
+  assert.equal(await chain.isTrainerRegistered(trainerKey.toBase58()), false);
+
+  // 4. Correct account -> true
+  fakeConnection.getAccountInfo = async () => ({
+    data: encodedTrainer,
+    executable: false,
+    lamports: 1000000,
+    owner: progId,
+  });
+  assert.equal(await chain.isTrainerRegistered(trainerKey.toBase58()), true);
+
+  // 5. Wrong wallet inside account -> false
+  assert.equal(await chain.isTrainerRegistered(otherTrainerKey.toBase58()), false);
+
+  // 6. Invalid wallet string -> false
+  assert.equal(await chain.isTrainerRegistered('not-a-valid-wallet'), false);
+});
+
+test('RealChain DEVNET=1 freshly generated wallet check', { skip: process.env.DEVNET !== '1' }, async () => {
+  const feePayer = Keypair.generate();
+  const progAddr = Keypair.generate().publicKey;
+  const chain = new RealChain({
+    rpcUrl: 'https://api.devnet.solana.com',
+    feePayerSecretKey: bs58.encode(feePayer.secretKey),
+    programmeAddress: progAddr.toBase58(),
+  });
+
+  const freshWallet = Keypair.generate().publicKey.toBase58();
+  const enrolled = await chain.isEnrolled(freshWallet);
+  assert.equal(enrolled, false);
+
+  const registered = await chain.isTrainerRegistered(freshWallet);
+  assert.equal(registered, false);
 });
 
 test('RealChain DEVNET=1 smoke test', { skip: process.env.DEVNET !== '1' }, async () => {
