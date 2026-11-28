@@ -11,6 +11,9 @@ import { makeRelayRoutes } from './routes/relay.js';
 import type { RelayOptions } from './routes/relay.js';
 import { Limiter } from './limiter.js';
 import { getDb, migrate } from './db.js';
+import idl from './chain/payday.idl.json' with { type: 'json' };
+
+const MOCK_BACKEND_KEY = '11111111111111111111111111111111';
 
 export function createApp(
   db: DatabaseSync,
@@ -38,6 +41,29 @@ export function createApp(
 
   app.get('/health', (c) => {
     return c.json({ status: 'ok' }, 200);
+  });
+
+  app.get('/config', (c) => {
+    const isReal = (chain as any)?.backendKeypair !== undefined || (chain as any)?.constructor?.name === 'RealChain';
+    const programId = process.env.PROGRAM_ID ?? (idl as { address?: string }).address ?? '';
+    let backendKey: string | null = null;
+
+    if (isReal) {
+      const realChain = chain as any;
+      backendKey = realChain.backendKeypair?.publicKey ? realChain.backendKeypair.publicKey.toBase58() : null;
+    } else {
+      backendKey = MOCK_BACKEND_KEY;
+    }
+
+    return c.json(
+      {
+        chain: isReal ? 'real' : 'mock',
+        cluster: 'devnet',
+        programId,
+        backendKey,
+      },
+      200,
+    );
   });
 
   app.route('/auth', makeAuthRoutes(db));
