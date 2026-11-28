@@ -1,14 +1,13 @@
 /// <reference types="vite/client" />
 import { useState } from 'react'
 import bs58 from 'bs58'
-import { Connection, Transaction } from '@solana/web3.js'
+import { Connection, Keypair, Transaction } from '@solana/web3.js'
 import { Button, Field, Input, Card, Notice, Qr } from '../ui'
 import { claim, claimUnlock, getRelay, getConfig, ApiError } from '../lib/api'
 import { explain } from '../lib/errors'
 import { createWallet, encryptKey, decryptKey, loadCache, saveCache } from '../lib/keys'
 import { shortAddress, currentDay } from '../lib/format'
 import { verifyRelayedTx } from '../lib/chain'
-import nacl from 'tweetnacl'
 
 // Route: #/join/<eventId>/<code>
 // Step 1 – claim:   phone + PIN → keypair → encrypt → POST /claim → cache pubkey
@@ -246,13 +245,13 @@ function SignStep({
 
       // Decrypt key — throws 'wrong_pin' if PIN is wrong
       const secretKey = await decryptKey(unlocked.encryptedKeyBlob, pin)
-      const kp = nacl.sign.keyPair.fromSecretKey(secretKey)
+      const kp = Keypair.fromSecretKey(secretKey)
 
       // Deserialise the partially-signed transaction from the relay
       const tx = Transaction.from(Buffer.from(verified.txBase64, 'base64'))
 
       // Add trainee's signature (second signer)
-      tx.partialSign({ publicKey: { toBuffer: () => Buffer.from(kp.publicKey), toBase58: () => pubkey } as never, secretKey: kp.secretKey })
+      tx.partialSign(kp)
 
       const rpcUrl = import.meta.env.VITE_RPC_URL ?? 'https://api.devnet.solana.com'
       const conn = new Connection(rpcUrl, 'confirmed')
