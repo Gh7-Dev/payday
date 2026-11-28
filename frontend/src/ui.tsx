@@ -154,16 +154,17 @@ export function Stat({ label, value, unit }: StatProps) {
 // ─── Notice ─────────────────────────────────────────────────────────
 
 interface NoticeProps {
+  style?: React.CSSProperties
   variant?: NoticeVariant
   children: React.ReactNode
   className?: string
 }
 
-export function Notice({ variant = 'info', children, className = '' }: NoticeProps) {
+export function Notice({ variant = 'info', children, className = '', style }: NoticeProps) {
   const variantClass =
     variant === 'warn' ? 'notice-warn' : variant === 'danger' ? 'notice-danger' : ''
   return (
-    <div className={`notice ${variantClass} ${className}`.trim()}>
+    <div className={`notice ${variantClass} ${className}`.trim()} style={style}>
       {children}
     </div>
   )
