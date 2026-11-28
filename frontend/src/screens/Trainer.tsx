@@ -85,12 +85,30 @@ export function Trainer({ eventId, code }: { eventId: string; code: string }) {
 
 // ── Step 1: Signup ────────────────────────────────────────────────────────────
 
+function usernameProblem(u: string): string {
+  if (u.length < 3) return 'Too short. Use at least 3 characters.'
+  if (u.length > 32) return 'Too long. Use at most 32 characters.'
+  const bad = Array.from(new Set(u.match(/[^a-z0-9_]/g) ?? []))
+  if (bad.length > 0) {
+    const shown = bad.map((c) => (c === ' ' ? 'space' : c)).join(' ')
+    return 'Not allowed: ' + shown + '. Use lowercase letters, digits and underscores only.'
+  }
+  return ''
+}
+
+function passwordProblem(pw: string): string {
+  return pw.length < 8 ? 'Too short. Use at least 8 characters (' + pw.length + ' so far).' : ''
+}
+
 function SignupStep({ code, onDone }: { code: string; onDone: (wallet: string) => void }) {
   const [username, setUsername] = useState('')
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const userMsg = username ? usernameProblem(username) : ''
+  const passMsg = password ? passwordProblem(password) : ''
+  const formOk = usernameProblem(username) === '' && passwordProblem(password) === '' && phone.trim() !== ''
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -120,7 +138,7 @@ function SignupStep({ code, onDone }: { code: string; onDone: (wallet: string) =
       </p>
       {err && <div style={{ marginBottom: 16 }}><Notice variant="danger">{err}</Notice></div>}
       <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Field label="Username">
+        <Field label="Username" hint="3 to 32 characters. Lowercase letters, digits and underscores only, for example mark_anthony." error={userMsg || undefined}>
           <Input
             placeholder="e.g. amara"
             value={username}
@@ -129,7 +147,7 @@ function SignupStep({ code, onDone }: { code: string; onDone: (wallet: string) =
             autoComplete="username"
           />
         </Field>
-        <Field label="Phone number">
+        <Field label="Phone number" hint="Use the number the organizer registered for you.">
           <Input
             type="tel"
             placeholder="+254 700 000 000"
@@ -139,7 +157,7 @@ function SignupStep({ code, onDone }: { code: string; onDone: (wallet: string) =
             autoComplete="tel"
           />
         </Field>
-        <Field label="Password" hint="Used to encrypt your signing key. Choose something strong.">
+        <Field label="Password" hint="At least 8 characters. It encrypts your signing key, so you will need it every time you check in." error={passMsg || undefined}>
           <Input
             type="password"
             placeholder="••••••••"
@@ -149,7 +167,7 @@ function SignupStep({ code, onDone }: { code: string; onDone: (wallet: string) =
             autoComplete="new-password"
           />
         </Field>
-        <Button variant="primary" large type="submit" disabled={busy} style={{ marginTop: 8 }}>
+        <Button variant="primary" large type="submit" disabled={busy || !formOk} style={{ marginTop: 8 }}>
           {busy ? 'Unlocking…' : 'Sign up'}
         </Button>
       </form>
