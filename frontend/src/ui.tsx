@@ -270,13 +270,13 @@ export function DayStrip({ total, current, cells }: DayStripProps) {
   return (
     <div className="day-strip" role="list" aria-label={`Day ${Math.max(0, current + 1)} of ${total}`}>
       {Array.from({ length: total }, (_, i) => (
-        <div
-          key={i}
-          className={`day-cell day-cell--${cells[i] ?? 'future'}`}
-          role="listitem"
-          aria-label={`Day ${i + 1}: ${cells[i] ?? 'future'}`}
-        >
-          <DayCellInner state={cells[i] ?? 'future'} />
+        <div key={i} className="day-unit" role="listitem">
+          <div
+            className={`day-cell day-cell--${cells[i] ?? 'future'}`}
+            aria-label={`Day ${i + 1}: ${cells[i] ?? 'future'}`}
+          >
+            <DayCellInner state={cells[i] ?? 'future'} />
+          </div>
           <span className="day-number small">{i + 1}</span>
         </div>
       ))}
@@ -304,34 +304,7 @@ function DayCellInner({ state }: { state: CellState }) {
       </svg>
     )
   }
-  if (state === 'missed') {
-    return <DiagonalLine />
-  }
   return null
-}
-
-function DiagonalLine() {
-  return (
-    <svg
-      className="day-missed-line"
-      xmlns="http://www.w3.org/2000/svg"
-      width="100%"
-      height="100%"
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      stroke-linecap="butt"
-      aria-hidden="true"
-    >
-      <line
-        x1="0"
-        y1="100"
-        x2="100"
-        y2="0"
-        stroke="var(--line-strong)"
-        strokeWidth="1"
-      />
-    </svg>
-  )
 }
 
 // ─── Qr ──────────────────────────────────────────────────────────────
